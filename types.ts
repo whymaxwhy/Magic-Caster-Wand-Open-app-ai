@@ -25,3 +25,8 @@ export interface OpCodes {
   Buzz: number;
   ChangeLed: number;
 }
+
+export interface Spell {
+  name: string;
+  firstSeen: string;
+}

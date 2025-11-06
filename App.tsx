@@ -1,10 +1,10 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Chat } from "@google/genai";
 import { WAND_GATT } from './constants';
-import type { LogEntry, LogType, VfxCommand, OpCodes, VfxCommandType } from './types';
+import type { LogEntry, LogType, VfxCommand, OpCodes, VfxCommandType, Spell } from './types';
 
-// FIX: Add minimal type definitions for Web Bluetooth API to resolve TypeScript errors.
+// Add minimal type definitions for Web Bluetooth API to resolve TypeScript errors.
 // This is a workaround for the environment not having these types available.
 // In a real project, this would be handled by including `@types/web-bluetooth`
 // or adding "web-bluetooth" to the "lib" array in tsconfig.json.
@@ -18,7 +18,7 @@ declare global {
 
 interface BluetoothDevice extends EventTarget {
   readonly name?: string;
-  readonly gatt?: BluetoothRemoteGATTServer;
+  readonly gatt?: BluetoothRemoteGGATTServer;
 }
 
 interface BluetoothRemoteGATTServer {
@@ -42,6 +42,11 @@ interface BluetoothRemoteGATTCharacteristic extends EventTarget {
 interface RequestDeviceOptions {
   filters: any[];
   optionalServices?: string[];
+}
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
 }
 
 // --- HELPER FUNCTIONS ---
@@ -73,6 +78,22 @@ const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-
 const FolderOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>;
 const HelpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>;
 const AiIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>;
+const SendIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.428A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>;
+const ScanIcon = () => (
+  <svg className="w-24 h-24 text-indigo-400 mx-auto mb-4" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <circle fill="none" stroke="currentColor" strokeWidth="2" cx="50" cy="50" r="1">
+        <animate attributeName="r" from="1" to="40" dur="2s" begin="0s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="1" to="0" dur="2s" begin="0s" repeatCount="indefinite"/>
+      </circle>
+       <circle fill="none" stroke="currentColor" strokeWidth="2" cx="50" cy="50" r="1">
+        <animate attributeName="r" from="1" to="40" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" from="1" to="0" dur="2s" begin="0.5s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+    <path stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round" d="M40 60 l20 -20 m-5 -15 l10 10"/>
+  </svg>
+);
 
 
 // --- UI COMPONENTS ---
@@ -113,6 +134,8 @@ const LogView: React.FC<LogViewProps> = ({ logs }) => {
 
 const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_OPCODES = 'magicWandOpCodes';
+const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
+
 
 interface RawPacket {
   id: number;
@@ -122,6 +145,11 @@ interface RawPacket {
 
 // Simple markdown parser for AI response
 const AITextParser: React.FC<{ text: string }> = ({ text }) => {
+  // Add a simple check to prevent rendering if text is empty or just whitespace
+  if (!text || text.trim() === '') {
+    return null;
+  }
+
   const lines = text.split('\n');
   const elements = lines.map((line, index) => {
     if (line.startsWith('* ')) {
@@ -130,10 +158,14 @@ const AITextParser: React.FC<{ text: string }> = ({ text }) => {
     if (line.startsWith('### ')) {
        return <h3 key={index} className="text-lg font-semibold mt-4 mb-2 text-indigo-300">{line.substring(4)}</h3>;
     }
-    line = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-100">$1</strong>');
-    return <p key={index} dangerouslySetInnerHTML={{ __html: line }} />;
+    // Use a regex to replace **bold** text with <strong> tags
+    const formattedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-slate-100">$1</strong>');
+    // Use another regex to replace `code` with <code> tags
+    const finalLine = formattedLine.replace(/`(.*?)`/g, '<code class="bg-slate-700 text-cyan-300 px-1 py-0.5 rounded text-sm">$1</code>');
+    
+    return <p key={index} dangerouslySetInnerHTML={{ __html: finalLine }} />;
   });
-  return <div className="space-y-2">{elements}</div>;
+  return <div className="space-y-2 prose prose-invert prose-sm max-w-none">{elements}</div>;
 };
 
 
@@ -146,19 +178,25 @@ export default function App() {
   const [isGripped, setIsGripped] = useState(false);
   const [lastSpell, setLastSpell] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'standard' | 'opcode'>('standard');
+  const [activeTab, setActiveTab] = useState<'standard' | 'opcode' | 'spellbook'>('standard');
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   
   const [opCodes, setOpCodes] = useState<OpCodes>({ ClearLeds: 0xAA, Buzz: 0xBB, ChangeLed: 0xCC });
-  const [currentOpCodeTest, setCurrentOpCodeTest] = useState(1);
+  // Explicitly set the type for the 'currentOpCodeTest' state to 'number' to avoid type inference issues.
+  const [currentOpCodeTest, setCurrentOpCodeTest] = useState<number>(1);
   const [testPayload, setTestPayload] = useState('00');
   const [vfxSequence, setVfxSequence] = useState<VfxCommand[]>([]);
   const [isSequenceSaved, setIsSequenceSaved] = useState(false);
   const [detectedOpCodes, setDetectedOpCodes] = useState<Set<number>>(new Set());
   const [rawPacketLog, setRawPacketLog] = useState<RawPacket[]>([]);
+  const [spellBook, setSpellBook] = useState<Spell[]>([]);
+
   
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
-  const [aiHelpResponse, setAiHelpResponse] = useState('');
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiUserInput, setAiUserInput] = useState('');
+
 
   const logCounter = useRef(0);
   const commandIdCounter = useRef(0);
@@ -166,7 +204,9 @@ export default function App() {
   const keepAliveInterval = useRef<number | null>(null);
   const writeCharacteristic = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const isInitialMountOpCodes = useRef(true);
+  const isInitialMountSpells = useRef(true);
   const ai = useMemo(() => process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null, []);
+  const chatSession = useRef<Chat | null>(null);
 
 
   const addLog = useCallback((type: LogType, message: string) => {
@@ -213,6 +253,20 @@ export default function App() {
       addLog('ERROR', `Failed to load OpCodes from storage: ${error}`);
       localStorage.removeItem(LOCAL_STORAGE_KEY_OPCODES);
     }
+     // Load Spell Book
+    try {
+      const savedSpellsJSON = localStorage.getItem(LOCAL_STORAGE_KEY_SPELLBOOK);
+      if (savedSpellsJSON) {
+        const savedSpells: Spell[] = JSON.parse(savedSpellsJSON);
+        if (Array.isArray(savedSpells)) {
+          setSpellBook(savedSpells);
+          addLog('INFO', 'Loaded spell book from storage.');
+        }
+      }
+    } catch (error) {
+      addLog('ERROR', `Failed to load spell book: ${error}`);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_SPELLBOOK);
+    }
   }, [addLog]);
 
   // Effect to auto-save OpCodes when they change
@@ -228,6 +282,27 @@ export default function App() {
       addLog('ERROR', `Failed to auto-save OpCodes: ${error}`);
     }
   }, [opCodes, addLog]);
+  
+  // Effect to auto-save Spell Book when it changes
+  useEffect(() => {
+    if (isInitialMountSpells.current) {
+        isInitialMountSpells.current = false;
+        return;
+    }
+    try {
+        localStorage.setItem(LOCAL_STORAGE_KEY_SPELLBOOK, JSON.stringify(spellBook));
+    } catch (error) {
+        addLog('ERROR', `Failed to save spell book: ${error}`);
+    }
+  }, [spellBook, addLog]);
+
+  // Effect to close scanner modal on successful connection
+  useEffect(() => {
+    if (isConnected && isScannerOpen) {
+      setIsScannerOpen(false);
+    }
+  }, [isConnected, isScannerOpen]);
+
 
 
   const clearKeepAlive = useCallback(() => {
@@ -327,8 +402,20 @@ export default function App() {
               return;
           }
           
-          addLog('SUCCESS', `SPELL DETECTED: *** ${cleanedSpellName.toUpperCase()} *** (Header: ${headerHex})`);
-          setLastSpell(cleanedSpellName.toUpperCase());
+          const spellNameUpper = cleanedSpellName.toUpperCase();
+          addLog('SUCCESS', `SPELL DETECTED: *** ${spellNameUpper} *** (Header: ${headerHex})`);
+          setLastSpell(spellNameUpper);
+
+          // Add to spell book if it's a new spell
+          setSpellBook(prevBook => {
+            const exists = prevBook.some(spell => spell.name === spellNameUpper);
+            if (!exists) {
+              addLog('INFO', `New spell "${spellNameUpper}" added to Spell Book!`);
+              return [...prevBook, { name: spellNameUpper, firstSeen: new Date().toISOString() }];
+            }
+            return prevBook;
+          });
+
 
         } catch (e) {
           addLog('ERROR', `Error decoding spell packet. Header: ${headerHex}, Packet: ${hexData}, Error: ${e}`);
@@ -366,16 +453,16 @@ export default function App() {
     addLog('INFO', `Battery Level: ${level}%`);
   }, [addLog]);
 
-  const analyzeWithAI = useCallback(async (initialError?: any) => {
+  const startAiChat = useCallback(async (initialError?: any) => {
     if (!ai) {
-      setAiHelpResponse("AI Assistant is not available. API_KEY is missing.");
+      setChatHistory([{ role: 'model', text: "AI Assistant is not available. API_KEY is missing." }]);
       setIsAiAssistantOpen(true);
       return;
     }
 
     setIsAiLoading(true);
     if (!isAiAssistantOpen) setIsAiAssistantOpen(true);
-    setAiHelpResponse('');
+    setChatHistory([]);
 
     const recentLogs = logs.slice(-20).map(l => `${l.timestamp} [${l.type}] ${l.message}`).join('\n');
     const browserSupport = navigator.bluetooth ? "Available" : "Not Available";
@@ -400,34 +487,87 @@ ${recentLogs}
         context += `\n### Initial Connection Error:\n\`\`\`\n${initialError}\n\`\`\``
     }
 
-    const prompt = `You are an expert AI assistant embedded in a Web Bluetooth application for a 'Magic Wand' device. Your role is to help users diagnose and solve connectivity issues and debug wand behavior based on the application's current state and logs. Be concise, helpful, and provide actionable advice. Format your response in simple markdown with bolding for emphasis and bullet points for steps.
+    const systemInstruction = `You are an expert AI assistant embedded in a Web Bluetooth application for a 'Magic Wand' device. Your role is to help users diagnose and solve connectivity issues and debug wand behavior based on the application's current state and logs. Be concise, helpful, and provide actionable advice. Format your response in simple markdown with bolding for emphasis, bullet points for steps, and use backticks for code or hex values. You are having a conversation, so keep your answers focused and directly address the user's questions after your initial analysis.`;
 
-Based on the state and logs below, analyze the situation and provide the most likely problem and a solution. If multiple issues seem possible, list them. If everything looks okay, say so and offer a general tip.
+    const initialPrompt = `Based on the state and logs below, analyze the situation and provide the most likely problem and a solution as your first message. If multiple issues seem possible, list them. If everything looks okay, say so and offer a general tip. After this initial analysis, you will continue as a conversational chatbot.
 
 ${context}
 `;
     
     try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-pro',
-        contents: prompt
+      chatSession.current = ai.chats.create({
+          model: 'gemini-2.5-pro',
+          config: { systemInstruction },
       });
-      // FIX: The error "Expected 0 arguments, but got 1" suggests `response.text` is a function
-      // that is being passed to the state setter, which React then calls with an argument.
-      // Calling the function directly provides the expected string value.
-      setAiHelpResponse(response.text());
+      // Changed 'contents' property to 'message' to align with Gemini API standards for chat.
+      const responseStream = await chatSession.current.sendMessageStream({ message: initialPrompt });
+
+      setIsAiLoading(false);
+      setChatHistory([{ role: 'model', text: '' }]);
+      
+      for await (const chunk of responseStream) {
+        const chunkText = chunk.text;
+        setChatHistory(prev => {
+          const newHistory = [...prev];
+          newHistory[newHistory.length - 1].text += chunkText;
+          return newHistory;
+        });
+      }
+
     } catch (error) {
         console.error("AI analysis failed:", error);
-        setAiHelpResponse(`Sorry, I encountered an error while analyzing the situation. Please check the browser console for details. Error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
+        const errorMessage = `Sorry, I encountered an error. Please check the browser console for details. Error: ${error instanceof Error ? error.message : String(error)}`;
+        setChatHistory([{ role: 'model', text: errorMessage }]);
         setIsAiLoading(false);
     }
   }, [ai, logs, isConnected, isLoading, device, opCodes, detectedOpCodes, isAiAssistantOpen]);
 
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiUserInput.trim() || !chatSession.current || isAiLoading) return;
+
+    const userMessage: ChatMessage = { role: 'user', text: aiUserInput };
+    setChatHistory(prev => [...prev, userMessage, { role: 'model', text: '' }]);
+    setAiUserInput('');
+    setIsAiLoading(true);
+
+    try {
+        // Changed 'contents' property to 'message' to align with Gemini API standards for chat.
+        const responseStream = await chatSession.current.sendMessageStream({ message: aiUserInput });
+        setIsAiLoading(false);
+
+        for await (const chunk of responseStream) {
+            const chunkText = chunk.text;
+            setChatHistory(prev => {
+              const newHistory = [...prev];
+              newHistory[newHistory.length - 1].text += chunkText;
+              return newHistory;
+            });
+        }
+    } catch (error) {
+        console.error("AI chat message failed:", error);
+        const errorMessage = `Sorry, I failed to get a response. Error: ${error instanceof Error ? error.message : String(error)}`;
+        setChatHistory(prev => {
+          const newHistory = [...prev];
+          newHistory[newHistory.length - 1].text = errorMessage;
+          return newHistory;
+        });
+        setIsAiLoading(false);
+    }
+  };
+  
+  // Effect to start AI chat when panel is opened
+  useEffect(() => {
+    if (isAiAssistantOpen && chatHistory.length === 0) {
+      startAiChat();
+    }
+  }, [isAiAssistantOpen, chatHistory.length, startAiChat]);
+
+
   const connectToWand = useCallback(async () => {
     if (!navigator.bluetooth) {
       addLog('ERROR', 'Web Bluetooth API is not available on this browser.');
-      analyzeWithAI('Web Bluetooth API is not available on this browser.');
+      startAiChat('Web Bluetooth API is not available on this browser.');
       return;
     }
     setIsLoading(true);
@@ -480,12 +620,13 @@ ${context}
 
     } catch (error) {
       addLog('ERROR', `Connection failed: ${error}`);
-      analyzeWithAI(error); // Proactively call AI on failure
+      // FIX: Ensure the argument is passed to startAiChat as it expects one.
+      startAiChat(error); // Proactively call AI on failure
       setDevice(null);
     } finally {
       setIsLoading(false);
     }
-  }, [addLog, handleDisconnect, parseWandData, handleBatteryLevel, sendRawCommand, analyzeWithAI]);
+  }, [addLog, handleDisconnect, parseWandData, handleBatteryLevel, sendRawCommand, startAiChat]);
 
   const disconnectFromWand = useCallback(async () => {
     if (device && device.gatt?.connected) {
@@ -686,28 +827,88 @@ ${context}
     </div>
   );
 
-  const AiAssistantPanel = () => (
-    <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4" onClick={() => setIsAiAssistantOpen(false)}>
-      <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <header className="p-4 border-b border-slate-600 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2"><AiIcon /> AI Assistant</h2>
-          <button onClick={() => setIsAiAssistantOpen(false)} className="text-slate-400 hover:text-white">&times;</button>
-        </header>
-        <div className="p-6 overflow-y-auto flex-grow">
-          {isAiLoading ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400"></div>
-              <p className="mt-4">Analyzing state and logs...</p>
+  const AiAssistantPanel = () => {
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [chatHistory]);
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4" onClick={() => setIsAiAssistantOpen(false)}>
+        <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <header className="p-4 border-b border-slate-600 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2"><AiIcon /> AI Assistant</h2>
+            <button onClick={() => setIsAiAssistantOpen(false)} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+            </header>
+            <div ref={chatContainerRef} className="p-6 overflow-y-auto flex-grow space-y-4">
+                {chatHistory.map((msg, index) => (
+                    <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                        {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0"><AiIcon/></div> }
+                        <div className={`w-fit max-w-md p-3 rounded-lg ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-200'}`}>
+                            <AITextParser text={msg.text} />
+                        </div>
+                    </div>
+                ))}
+                {isAiLoading && chatHistory.length > 0 && (
+                    <div className="flex items-end gap-2">
+                        <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0"><AiIcon/></div>
+                        <div className="w-fit max-w-md p-3 rounded-lg bg-slate-700 text-slate-200">
+                            <div className="flex items-center justify-center gap-1">
+                                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce"></span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                 {isAiLoading && chatHistory.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400"></div>
+                      <p className="mt-4">Performing initial analysis...</p>
+                    </div>
+                )}
             </div>
-          ) : (
-            aiHelpResponse ? <AITextParser text={aiHelpResponse} /> : <p className="text-slate-400">Click the button below to analyze the application state for potential issues.</p>
-          )}
+            <footer className="p-4 border-t border-slate-600">
+                <form onSubmit={handleSendChatMessage} className="flex gap-2">
+                    <input 
+                        type="text" 
+                        value={aiUserInput}
+                        onChange={e => setAiUserInput(e.target.value)}
+                        placeholder="Ask a follow-up question..."
+                        disabled={isAiLoading}
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <button type="submit" disabled={isAiLoading || !aiUserInput.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-not-allowed transition-colors flex items-center justify-center">
+                        <SendIcon />
+                    </button>
+                </form>
+            </footer>
         </div>
-        <footer className="p-4 border-t border-slate-600">
-          <button onClick={() => analyzeWithAI()} disabled={isAiLoading} className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-wait transition-colors">
-            {isAiLoading ? 'Analyzing...' : 'Analyze Current State'}
+        </div>
+    );
+  };
+
+  const DeviceScannerModal = () => (
+    <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4" onClick={() => setIsScannerOpen(false)}>
+      <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-full max-w-md flex flex-col" onClick={e => e.stopPropagation()}>
+        <header className="p-4 border-b border-slate-600 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-slate-100">Find Your Wand</h2>
+          <button onClick={() => setIsScannerOpen(false)} className="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+        </header>
+        <div className="p-8 text-center">
+          <ScanIcon />
+          <p className="text-slate-300 mb-6">Make sure your wand is turned on and nearby, then press Start Scan to begin.</p>
+          <button
+            onClick={connectToWand}
+            disabled={isLoading}
+            className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-wait transition-colors"
+          >
+            {isLoading ? 'Waiting for selection...' : 'Start Scan'}
           </button>
-        </footer>
+          <p className="text-xs text-slate-500 mt-2">This will open your browser's Bluetooth device chooser.</p>
+        </div>
       </div>
     </div>
   );
@@ -720,7 +921,7 @@ ${context}
         </h1>
         {!isConnected ? (
           <button
-            onClick={() => connectToWand()}
+            onClick={() => setIsScannerOpen(true)}
             disabled={isLoading}
             className="mt-4 md:mt-0 w-full md:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-wait transition-colors"
           >
@@ -745,6 +946,7 @@ ${context}
             <div className="flex border-b border-slate-600 mb-4">
                 <button onClick={() => setActiveTab('standard')} className={`px-4 py-2 text-lg font-semibold ${activeTab === 'standard' ? 'border-b-2 border-indigo-500 text-white' : 'text-slate-400'}`}>Controller</button>
                 <button onClick={() => setActiveTab('opcode')} className={`px-4 py-2 text-lg font-semibold ${activeTab === 'opcode' ? 'border-b-2 border-indigo-500 text-white' : 'text-slate-400'}`}>OpCode Discovery</button>
+                <button onClick={() => setActiveTab('spellbook')} className={`px-4 py-2 text-lg font-semibold ${activeTab === 'spellbook' ? 'border-b-2 border-indigo-500 text-white' : 'text-slate-400'}`}>Spell Book</button>
             </div>
             
             {activeTab === 'standard' && (
@@ -771,8 +973,8 @@ ${context}
                   </div>
                    <div className="flex flex-wrap gap-2">
                       <button onClick={() => sendVfxMacro(vfxSequence)} disabled={!isConnected || vfxSequence.length === 0} className="flex-grow p-2 bg-indigo-600 hover:bg-indigo-500 rounded disabled:opacity-50 transition-colors">Send Sequence</button>
-                      <button onClick={() => saveVfxSequence()} disabled={!isConnected} className="flex-grow p-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors flex items-center justify-center"><SaveIcon /> Save</button>
-                      <button onClick={() => loadVfxSequence()} disabled={!isConnected || !isSequenceSaved} className="flex-grow p-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors flex items-center justify-center"><FolderOpenIcon /> Load</button>
+                      <button onClick={() => saveVfxSequence()} className="flex-grow p-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors flex items-center justify-center"><SaveIcon /> Save</button>
+                      <button onClick={() => loadVfxSequence()} disabled={!isSequenceSaved} className="flex-grow p-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors flex items-center justify-center"><FolderOpenIcon /> Load</button>
                       <button onClick={() => setVfxSequence([])} disabled={vfxSequence.length === 0} className="p-2 text-slate-300 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors"><TrashIcon /></button>
                    </div>
                 </div>
@@ -839,8 +1041,7 @@ ${context}
                   </div>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => handleOpCodeTest()} disabled={!isConnected} className="w-full p-2 bg-indigo-600 hover:bg-indigo-500 rounded disabled:opacity-50 transition-colors">Send Test Command</button>
-                    {/* FIX: The arithmetic type errors on this line are likely due to the type checker being
-                        confused by the redundant Number() call. Removing it simplifies the expression. */}
+                    {/* FIX: Use a functional update for state to prevent type errors from stale closures. */}
                     <button onClick={() => setCurrentOpCodeTest(c => (c + 1) % 256)} disabled={!isConnected} className="w-full p-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors">Next OpCode</button>
                   </div>
                  </div>
@@ -886,6 +1087,42 @@ ${context}
                  </div>
               </div>
             )}
+
+            {activeTab === 'spellbook' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Discovered Spells</h3>
+                  <p className="text-sm text-slate-400 mb-4">Spells you cast are automatically recorded here.</p>
+                  <div className="bg-slate-900 rounded-lg p-3 border border-slate-700 min-h-[10rem] max-h-96 overflow-y-auto">
+                    {spellBook.length === 0 ? (
+                      <p className="text-slate-500 text-center py-4">Your spell book is empty. Cast some spells to fill it up!</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {spellBook.sort((a,b) => a.name.localeCompare(b.name)).map(spell => (
+                          <li key={spell.name} className="p-3 bg-slate-800 rounded flex justify-between items-center">
+                            <span className="font-bold text-yellow-300 tracking-wider">{spell.name}</span>
+                            <span className="text-xs text-slate-500">First seen: {new Date(spell.firstSeen).toLocaleDateString()}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  {spellBook.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to clear your entire spell book? This cannot be undone.')) {
+                          setSpellBook([]);
+                          addLog('INFO', 'Spell book has been cleared.');
+                        }
+                      }}
+                      className="w-full mt-4 p-2 bg-red-800/50 hover:bg-red-700/50 rounded transition-colors text-sm text-red-300"
+                    >
+                      Clear Spell Book
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="row-start-3 lg:row-start-2 lg:col-start-2">
@@ -904,6 +1141,7 @@ ${context}
       )}
 
       {isAiAssistantOpen && <AiAssistantPanel />}
+      {isScannerOpen && <DeviceScannerModal />}
 
     </div>
   );
