@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Magic Wand BLE Controller",
+  "description": "A web-based controller for a Bluetooth Low Energy (BLE) magic wand. It allows connecting to the wand, viewing real-time data like spell casts and grip status, and sending custom VFX/haptic commands. Includes an OpCode discovery tool for reverse engineering wand effects.",
+  "requestFramePermissions": []
+}
