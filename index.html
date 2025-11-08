@@ -17,6 +17,19 @@
   }
 }
 </script>
+<style>
+      .toggle-checkbox:checked {
+        right: 0;
+        border-color: #4f46e5; /* indigo-600 */
+        transform: translateX(100%);
+      }
+      .toggle-checkbox:checked + .toggle-label {
+        background-color: #4f46e5; /* indigo-600 */
+      }
+       .toggle-checkbox {
+        transition: transform 0.2s ease-in-out;
+       }
+</style>
 </head>
   <body class="bg-slate-900 text-slate-200">
     <div id="root"></div>
