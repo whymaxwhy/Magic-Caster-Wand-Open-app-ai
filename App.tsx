@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS } from './constants';
@@ -91,7 +92,8 @@ const BatteryIcon = ({ level }: { level: number | null }) => {
 const PlusCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" /></svg>;
 // FIX: Replaced malformed SVG path data with a valid path. The original path had an invalid command sequence and could cause JSX parsing errors that manifest as arithmetic operation errors.
 const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8z m5 -1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>;
-const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>;
+// FIX: Corrected malformed SVG path data. The original path contained 'l-3-3' without a space which could be misparsed as an arithmetic operation by JSX.
+const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2V9a2 2 0 0 0 -2 -2h-3m-1 4l-3 3m0 0l-3 -3m3 3V4" /></svg>;
 const FolderOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>;
 const ScanIcon = () => (
   <svg className="w-24 h-24 text-indigo-400 mx-auto mb-4" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -111,7 +113,7 @@ const ScanIcon = () => (
 const ChartBarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
         {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
-        <path fillRule="evenodd" d="M3 3a1 1 0 011 -1h12a1 1 0 011 1v14a1 1 0 01-1 -1H4a1 1 0 01-1 -1V3zm2 12a1 1 0 011 -1h2a1 1 0 011 1v -5a1 1 0 01-1 -1H6a1 1 0 01-1 1v5zm5 -8a1 1 0 011 -1h2a1 1 0 011 1v8a1 1 0 01-1 1h-2a1 1 0 01-1 -1V7z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M3 3a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 -1H4a1 1 0 0 1 -1 -1V3zm2 12a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v-5a1 1 0 0 1 -1 -1H6a1 1 0 0 1 -1 1v5zm5 -8a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1V7z" clipRule="evenodd" />
     </svg>
 );
 const CodeIcon = () => (
@@ -123,19 +125,19 @@ const CodeIcon = () => (
 const SearchCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         {/* FIX: Corrected malformed SVG path data. The original path contained missing spaces around negative numbers, which could be misparsed as an arithmetic operation by JSX. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6 -6m2 -5a7 7 0 11 -14 0 7 7 0 0114 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6 -6m2 -5a7 7 0 1 1 -14 0 7 7 0 0 1 14 0z" />
     </svg>
 );
 const LinkIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         {/* FIX: Corrected malformed SVG path data. The original path contained missing spaces around negative numbers, which could be misparsed as an arithmetic operation by JSX. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102 -1.101m-.758 -4.899a4 4 0 005.656 0l4 -4a4 4 0 00-5.656 -5.656l-1.1 1.1" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0 -5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102 -1.101m-.758 -4.899a4 4 0 0 0 5.656 0l4 -4a4 4 0 0 0 -5.656 -5.656l-1.1 1.1" />
     </svg>
 );
 const LinkBreakIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         {/* FIX: Corrected malformed SVG path data. The original path contained 'l4-4' and '-5.656-5.656' without spaces which could be misparsed as an arithmetic operation. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102 -1.101m-.758 -4.899a4 4 0 005.656 0l4 -4a4 4 0 00-5.656 -5.656l-1.1 1.1 M15 12 a 3 3 0 1 1 -6 0 a 3 3 0 0 1 6 0 z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0 -5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102 -1.101m-.758 -4.899a4 4 0 0 0 5.656 0l4 -4a4 4 0 0 0 -5.656 -5.656l-1.1 1.1 M15 12 a 3 3 0 1 1 -6 0 a 3 3 0 0 1 6 0 z" />
     </svg>
 );
 const DocumentSearchIcon = () => (
@@ -164,6 +166,84 @@ const CheckCircleIcon = () => (
 
 
 // --- UI COMPONENTS ---
+
+// New: Tutorial Modal, inspired by TutorialActivity.smali
+interface TutorialModalProps {
+  onFinish: () => void;
+}
+
+const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish }) => {
+  const [step, setStep] = useState(1);
+  const totalSteps = 6;
+
+  const tutorialSteps = [
+    {
+      title: "Welcome to the Magic Wand Controller!",
+      content: "This brief tour will guide you through the key features of this application. You can use it to connect to your wand, analyze its behavior, and even create your own custom light and haptic effects."
+    },
+    {
+      title: "Step 1: Connect Your Devices",
+      content: "The 'Device Manager' tab is your first stop. Here, you can scan for and connect to your Magic Wand and its companion Wand Box. Just click the 'Connect' button for each device to get started."
+    },
+    {
+      title: "Step 2: Cast Spells",
+      content: "Once your wand is connected, use it to cast a spell! The 'Control Hub' will show you the last spell you cast and display detailed information about it, powered by Gemini."
+    },
+    {
+      title: "Step 3: Create Custom Effects",
+      content: "The 'VFX Macro Editor' in the Control Hub lets you design your own sequences of light transitions, haptic feedback, and delays. Send them directly to your wand to see your creation come to life."
+    },
+    {
+      title: "Step 4: Dive Deeper",
+      content: "For advanced users and reverse engineers, the 'Diagnostics', 'BLE Explorer', and 'Python Scripter' tabs provide powerful tools to monitor raw data, inspect BLE services, and generate control scripts."
+    },
+    {
+      title: "You're All Set!",
+      content: "That's the end of the tour. You can re-open this guide anytime from the Device Manager tab. Enjoy exploring the magic of your wand!"
+    }
+  ];
+
+  const currentStep = tutorialSteps[step - 1];
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
+      <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-lg border border-slate-700 m-4">
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-2xl font-bold text-indigo-400">{currentStep.title}</h2>
+            <div className="text-sm font-mono text-slate-500">{step}/{totalSteps}</div>
+          </div>
+          <p className="text-slate-300 mb-6">{currentStep.content}</p>
+        </div>
+        <div className="bg-slate-900/50 p-4 rounded-b-lg flex justify-between items-center">
+          <button
+            onClick={() => step > 1 && setStep(step - 1)}
+            disabled={step === 1}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+          {step < totalSteps ? (
+            <button
+              onClick={() => setStep(step + 1)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded font-semibold"
+            >
+              Next
+            </button>
+          ) : (
+            <button
+              onClick={onFinish}
+              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded font-semibold"
+            >
+              Finish
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 interface LogViewProps {
   logs: LogEntry[];
@@ -240,6 +320,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ state }) => {
 
 const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
+const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 
 
 interface RawPacket {
@@ -381,6 +462,9 @@ export default function App() {
   // New: State for Protocol Settings
   const [commandDelay_ms, setCommandDelay_ms] = useState(20);
 
+  // New: State for Tutorial Modal
+  const [showTutorial, setShowTutorial] = useState(false);
+
 
   // --- Command Queue State ---
   const [writeQueue, setWriteQueue] = useState<WriteQueueItem[]>([]);
@@ -395,6 +479,9 @@ export default function App() {
   const isInitialMountSpells = useRef(true);
   // Fix: Memoize the set of discovered spells with toUpperCase for case-insensitive checking.
   const discoveredSpells = useMemo(() => new Set(spellBook.map(s => s.name.toUpperCase())), [spellBook]);
+
+  // New: Ref to store macro indices, based on smali reverse engineering
+  const macroIndexes = useRef<Record<string, number>>({});
 
 
   const addLog = useCallback((type: LogType, message: string) => {
@@ -479,6 +566,19 @@ export default function App() {
       if (savedHueLight) setHueLightId(savedHueLight);
     } catch (error) {
       addLog('ERROR', 'Failed to load Hue settings from storage.');
+    }
+  }, [addLog]);
+
+  // New: useEffect to check for tutorial completion on mount
+  useEffect(() => {
+    try {
+      const tutorialCompleted = localStorage.getItem(LOCAL_STORAGE_KEY_TUTORIAL);
+      if (tutorialCompleted !== 'true') {
+        setShowTutorial(true);
+      }
+    } catch (error) {
+      addLog('ERROR', `Could not read tutorial status from storage: ${error}`);
+      setShowTutorial(true); // Show tutorial if storage fails
     }
   }, [addLog]);
 
@@ -1545,6 +1645,103 @@ Be precise and base your conclusions directly on the provided code.`;
           setIsExploring(false);
       }
   }, [addLog]);
+  
+  const sendMacroSequenceFromCommands = useCallback((commands: MacroCommand[]) => {
+    if (wandConnectionState !== 'Connected' || !commandCharacteristic.current) {
+        addLog('ERROR', 'Cannot send macro sequence: Wand not connected.');
+        return;
+    }
+
+    addLog('INFO', 'Building and sending spell VFX macro sequence...');
+    const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
+    let hasError = false;
+
+    commands.forEach(cmd => {
+        if (hasError) return;
+        
+        const loops = cmd.loops ?? 1;
+        for (let i = 0; i < loops; i++) {
+            switch (cmd.command) {
+                case 'LightClear':
+                    payload.push(WBDLProtocol.INST.MACRO_LIGHT_CLEAR);
+                    break;
+                case 'HapticBuzz': {
+                    const duration = cmd.duration ?? 100;
+                    payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
+                    break;
+                }
+                case 'MacroDelay': {
+                    const duration = cmd.duration ?? 100;
+                    payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
+                    break;
+                }
+                case 'LightTransition': {
+                    const hex = cmd.color ?? '#ffffff';
+                    const mode = cmd.group ?? 0; // 'group' in MacroCommand maps to 'mode'
+                    const duration = cmd.duration ?? 1000;
+                    
+                    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                        addLog('ERROR', `Invalid hex color "${hex}" in macro command. Aborting sequence.`);
+                        hasError = true;
+                        return;
+                    }
+
+                    const r = parseInt(hex.substring(1, 3), 16);
+                    const g = parseInt(hex.substring(3, 5), 16);
+                    const b = parseInt(hex.substring(5, 7), 16);
+                    
+                    payload.push(
+                        WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
+                        mode, r, g, b,
+                        duration & 0xFF, (duration >> 8) & 0xFF
+                    );
+                    break;
+                }
+                default:
+                    addLog('WARNING', `Unknown command in macro sequence: ${cmd.command}`);
+                    break;
+            }
+        }
+    });
+
+    if (hasError) return;
+
+    const finalPayload = new Uint8Array(payload);
+    
+    if (finalPayload.length > negotiatedMtu) {
+        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${negotiatedMtu} bytes). Splitting into chunks.`);
+        for (let i = 0; i < finalPayload.length; i += negotiatedMtu) {
+            const chunk = finalPayload.slice(i, i + negotiatedMtu);
+            queueCommand(chunk);
+        }
+    } else {
+        queueCommand(finalPayload);
+    }
+  }, [addLog, wandConnectionState, queueCommand, negotiatedMtu]);
+  
+  const castCompendiumSpell = useCallback((spellDetails: SpellDetails | null) => {
+    if (wandConnectionState !== 'Connected') {
+        addLog('ERROR', 'Wand not connected.');
+        return;
+    }
+    if (!spellDetails || !spellDetails.macros_payoff || spellDetails.macros_payoff.length === 0) {
+        addLog('WARNING', `No macro found for spell ${spellDetails?.spell_name}.`);
+        return;
+    }
+
+    const deviceType = 'WAND'; // Assume WAND for now
+
+    const currentIndex = macroIndexes.current[deviceType] ?? -1;
+    const nextIndex = (currentIndex + 1) % spellDetails.macros_payoff.length;
+    macroIndexes.current[deviceType] = nextIndex;
+
+    const macroVariation = spellDetails.macros_payoff[nextIndex];
+
+    addLog('INFO', `Casting '${spellDetails.spell_name}'. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
+
+    sendMacroSequenceFromCommands(macroVariation);
+  }, [addLog, wandConnectionState, sendMacroSequenceFromCommands]);
+
 
   const fetchCompendiumDetails = useCallback(async (spellName: string) => {
     if (!spellName) return;
@@ -1624,6 +1821,27 @@ Be precise and base your conclusions directly on the provided code.`;
         fetchCompendiumDetails(selectedCompendiumSpell);
     }
   }, [selectedCompendiumSpell, fetchCompendiumDetails]);
+  
+  const handleFinishTutorial = useCallback(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY_TUTORIAL, 'true');
+      setShowTutorial(false);
+      addLog('INFO', 'Tutorial completed. Welcome!');
+    } catch (error) {
+      addLog('ERROR', `Failed to save tutorial status: ${error}`);
+      setShowTutorial(false); // Hide it anyway
+    }
+  }, [addLog]);
+
+  const handleResetTutorial = useCallback(() => {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY_TUTORIAL);
+      setShowTutorial(true);
+      addLog('INFO', 'Tutorial has been reset and will show again.');
+    } catch (error) {
+      addLog('ERROR', `Failed to reset tutorial status: ${error}`);
+    }
+  }, [addLog]);
 
 
 
@@ -1677,6 +1895,7 @@ Be precise and base your conclusions directly on the provided code.`;
           negotiatedMtu={negotiatedMtu}
           commandDelay_ms={commandDelay_ms}
           setCommandDelay_ms={setCommandDelay_ms}
+          onResetTutorial={handleResetTutorial}
       />;
       case 'diagnostics': return <Diagnostics 
         detectedOpCodes={detectedOpCodes}
@@ -1729,6 +1948,7 @@ Be precise and base your conclusions directly on the provided code.`;
 
   return (
     <div className="min-h-screen flex flex-col p-4 bg-slate-900 text-slate-200 gap-4">
+      {showTutorial && <TutorialModal onFinish={handleFinishTutorial} />}
       {isScannerOpen && (
         <Modal title={`Scan for ${deviceToScan === 'wand' ? 'Wand' : 'Wand Box'}`} onClose={() => setIsScannerOpen(false)}>
           <div className="text-center p-8">
@@ -1753,6 +1973,8 @@ Be precise and base your conclusions directly on the provided code.`;
               spellDetails={compendiumSpellDetails}
               isLoading={isFetchingCompendiumDetails}
               error={compendiumError}
+              onCast={castCompendiumSpell}
+              isWandConnected={wandConnectionState === 'Connected'}
           />
         </Modal>
       )}
@@ -1870,8 +2092,11 @@ interface SpellDetailsCardProps {
     spellDetails: SpellDetails | null;
     isLoading: boolean;
     error: string | null;
+    onCast?: (spellDetails: SpellDetails) => void;
+    isWandConnected?: boolean;
 }
-const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoading, error }) => {
+
+const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoading, error, onCast, isWandConnected }) => {
     if (isLoading) {
         return (
             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 animate-pulse">
@@ -1922,6 +2147,18 @@ const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoa
                     ))}
                 </div>
             </div>
+            {onCast && spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-600">
+                    <button 
+                        onClick={() => onCast(spellDetails)}
+                        disabled={!isWandConnected}
+                        className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
+                        title={!isWandConnected ? 'Connect wand to cast spell' : 'Execute spell VFX on wand'}
+                    >
+                        Cast Spell
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -2045,9 +2282,9 @@ const VfxCommandEditor: React.FC<VfxCommandEditorProps> = ({ command, onUpdate, 
 };
 
 
-const DeviceManager = ({ wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel, onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled, setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled, setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId, setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms }: any) => {
+const DeviceManager = ({ wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel, onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled, setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled, setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId, setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial }: any) => {
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 h-full overflow-y-auto pr-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <DeviceCard 
                     title="Magic Wand" 
@@ -2065,6 +2302,7 @@ const DeviceManager = ({ wandConnectionState, boxConnectionState, wandDetails, b
                     details={boxDetails} 
                     batteryLevel={boxBatteryLevel}
                     onConnect={onConnectBox}
+// FIX: Corrected typo. It should be rawBoxProductInfo, not rawProductInfo.
                     rawProductInfo={rawBoxProductInfo}
                     wandDetails={wandDetails}
                     boxDetails={boxDetails}
@@ -2156,6 +2394,18 @@ const DeviceManager = ({ wandConnectionState, boxConnectionState, wandDetails, b
                     </IntegrationToggle>
 
                  </div>
+            </div>
+             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                <h3 className="text-xl font-semibold mb-3">App Settings</h3>
+                <div className="flex justify-between items-center">
+                    <p className="text-sm text-slate-400">Show the introductory tutorial again.</p>
+                    <button
+                        onClick={onResetTutorial}
+                        className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg text-sm"
+                    >
+                        Reset Tutorial
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -2340,12 +2590,11 @@ const Diagnostics = ({ detectedOpCodes, rawPacketLog, bleEventLog, isImuStreamin
                                     <span>Enable Detector:</span>
                                     <div className="relative inline-block w-10 ml-2 align-middle select-none">
                                         {/* FIX: The style attribute on this input was malformed, causing a JSX parsing error. It has been corrected to a valid React style object. This type of error often manifests as an arithmetic operation error when the parser misinterprets parts of the style string. */}
-                                        <input 
-                                            type="checkbox" 
+                                        <input
+                                            type="checkbox"
                                             checked={isClientSideGestureDetectionEnabled}
                                             onChange={(e) => setIsClientSideGestureDetectionEnabled(e.target.checked)}
                                             className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                                            style={{ right: 'auto', transform: isClientSideGestureDetectionEnabled ? 'translateX(100%)' : 'translateX(0)' }}
                                         />
                                         <label className="toggle-label block overflow-hidden h-5 rounded-full bg-slate-600 cursor-pointer"></label>
                                     </div>
@@ -2497,7 +2746,7 @@ const SpellCompendium = ({ spellBook, onSelectSpell }: {spellBook: Spell[], onSe
         <div className="h-full flex flex-col">
             <h3 className="text-xl font-semibold mb-4">Spell Compendium</h3>
             <p className="text-sm text-slate-400 mb-4">
-                Explore the full list of known spells. Click on a spell to use Gemini to generate its properties, description, and a plausible VFX macro based on its effects. This demonstrates how generative AI can be used to reverse-engineer and even create content for complex systems.
+                Explore the full list of known spells. Click on a spell to use Gemini to generate its properties, description, and a plausible VFX macro based on its effects. This demonstrates how generative AI can be used to reverse-engineer and even create content for this complex systems.
             </p>
             <div className="flex-grow overflow-y-auto pr-2">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">

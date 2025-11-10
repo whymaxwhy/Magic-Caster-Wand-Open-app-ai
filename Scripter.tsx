@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { WBDLProtocol, WBDLPayloads } from './constants';
@@ -62,24 +63,25 @@ ${JSON.stringify({ INST: WBDLProtocol.INST }, null, 2)}
 ${JSON.stringify({ CMD: WBDLProtocol.CMD }, null, 2)}
 
 # The Spell Data Model (from firmware analysis)
-The native app uses a complex 'Spell' data model, delivered inside a 'SpellBook' JSON object. The 'SpellBook' simply contains a list of 'Spell' objects under a key named 'spells'. The property names in the JSON are snake_case.
+The native app uses a complex 'Spell' data model, delivered inside a 'SpellBook' JSON object. The 'SpellBook' simply contains a list of 'Spell' objects under a key named 'spells'. All property names in the JSON are snake_case.
 
-A single 'Spell' object contains:
-- General info: 'spell_name', 'description', 'difficulty' (1-5), 'spell_type', 'incantation_name', 'pronunciation'.
-- Asset links: 'image_gesture', 'image_pretty', 'video_payoff', 'model3d'.
-- 'spell_uses': (List) A list of 'SpellUse' objects, where each object has 'id', 'name', and 'icon' string properties.
-- Crucially, it contains configuration objects for different devices using snake_case keys:
-  - 'config_wand': This object contains a 'macros_payoff', which is a list of lists of command objects. This is the exact sequence to run on the wand for the spell's effect.
-  - 'config_wandbox', 'config_smartlamp', 'config_enchanted_object': Defines spell effects for other compatible devices.
+A single 'Spell' object contains general info, asset links, and crucially, configuration objects for different devices:
+- 'config_wand': Defines effects for the wand.
+- 'config_wandbox': Defines effects for the wand storage box.
+- Other configs like 'config_smartlamp' also exist.
 
-A command object within the 'macros_payoff' can have these properties:
-- 'command': (String) The name of the command, like 'LightTransition'.
-- 'color': (String) Hex color code.
-- 'group': (Integer) An integer ID, possibly for an LED group or effect target.
+Both 'config_wand' and 'config_wandbox' contain a key named 'macros_payoff'. Firmware analysis confirms the structure of 'macros_payoff' is a list of macro variations.
+- **Structure:** \`List<List<Command>>\`. The outer list holds different variations of the spell effect. The inner list is a sequence of commands for one specific variation.
+- **Behavior:** The native application cycles through the variations (the outer list) with each cast of the same spell. When generating a script, you should typically pick the first variation (index 0) as a representative example unless the user specifies otherwise.
+
+A 'Command' object within a macro variation has the following confirmed properties:
+- 'command': (String) The name of the command (e.g., 'LightTransition', 'HapticBuzz', 'MacroDelay').
+- 'color': (String) Hex color code for light commands (e.g., "#FF0000").
+- 'group': (Integer) An integer ID, likely for targeting a specific LED group or effect parameter.
 - 'loops': (Integer) The number of times to repeat the command.
 - 'duration': (Double) The duration for the command in milliseconds.
 
-When a user asks to replicate a spell, you should infer what the 'macros_payoff' for the 'config_wand' would look like and generate the Python script to send that sequence.
+When a user asks to replicate a spell, you must infer a plausible 'macros_payoff' sequence for the 'config_wand' and generate the Python script to send that sequence.
 
 # Script Generation Rules
 Based on the user's request, generate a complete, runnable Python script using 'asyncio' and 'bleak'.
