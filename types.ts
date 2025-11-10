@@ -83,7 +83,7 @@ export interface BleEvent {
   detail: string;
 }
 
-export type VfxCommandType = 'LightClear' | 'HapticBuzz' | 'LightTransition' | 'MacroDelay';
+export type VfxCommandType = 'LightClear' | 'HapticBuzz' | 'LightTransition' | 'MacroDelay' | 'LoopStart' | 'LoopEnd';
 
 export type GestureState = 'Idle' | 'Casting' | 'Processing';
 
@@ -127,6 +127,7 @@ export interface VfxCommand {
     hex_color?: string;      // For LightTransition
     mode?: number;           // For LightTransition
     transition_ms?: number;  // For LightTransition
+    loops?: number;          // For LoopEnd
   };
 }
 
@@ -181,4 +182,17 @@ export interface ExplorerCharacteristic {
 export interface ExplorerService {
   uuid: string;
   characteristics: ExplorerCharacteristic[];
+}
+
+// FIX: Added missing RawPacket type definition.
+export interface RawPacket {
+  id: number;
+  timestamp: string;
+  hexData: string;
+}
+
+// New: Type for button threshold data
+export interface ButtonThresholds {
+    min: number | null;
+    max: number | null;
 }

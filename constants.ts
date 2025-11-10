@@ -73,11 +73,15 @@ export const WBDLProtocol = {
     // --- Guessed from Smali analysis ---
     EXECUTE_PREDEFINED_MACRO: 0x69, // GUESS: Opcode to run a built-in effect
     SET_BUTTON_THRESHOLD: 0x70,     // GUESS: Opcode for setting grip sensitivity
+    READ_BUTTON_THRESHOLD: 0xDD,    // New from smali: Opcode to read grip sensitivity
   },
   INST: {
     MACRO_DELAY: 0x10,
     MACRO_LIGHT_CLEAR: 0x20,
     MACRO_LIGHT_TRANSITION: 0x22,
+    // New from smali analysis
+    MACRO_SET_LOOPS: 0x80, // Sets loop count and marks end of loop block
+    MACRO_LOOP_START: 0x81, // Marks start of a loop block
   },
   PREDEFINED_MACRO_ID: {
       // Guesses based on R.raw.smali discovery. The names are derived from the smali resource names.
@@ -97,6 +101,7 @@ export const WBDLProtocol = {
       GESTURE_EVENT: 0x25,      // GUESS
       BUTTON_STATE_UPDATE: 0x26, // GUESS
       PRODUCT_INFO_RESPONSE: 0x0E, // Confirmed from Box smali
+      BUTTON_THRESHOLD_RESPONSE: 0xDE, // GUESS: Response to READ_BUTTON_THRESHOLD
   },
 
   // --- Wand Box Constants (Updated with Confirmed Values from Smali) ---

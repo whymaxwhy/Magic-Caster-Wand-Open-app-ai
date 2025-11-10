@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { WBDLProtocol, WBDLPayloads } from './constants';
@@ -11,19 +12,19 @@ interface ScripterProps {
 const CodeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4 -16m4 4l4 4 -4 4M6 16l-4 -4 4 -4" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20 l 4 -16 m 4 4 l 4 4 -4 4 M 6 16 l -4 -4 4 -4" />
     </svg>
 );
 
 const ClipboardIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v2 m -6 12h8a2 2 0 0 0 2 -2v-8a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2z" />
     </svg>
 );
 
 const CheckIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13 l 4 4 L 19 7" />
     </svg>
 );
 
@@ -45,7 +46,8 @@ const Scripter: React.FC<ScripterProps> = ({ addLog }) => {
     addLog('INFO', `Sending prompt to Gemini: "${prompt}"`);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
+const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
 
       const systemInstruction = `You are an expert Python developer specializing in Bluetooth Low Energy (BLE) communication using the 'bleak' library. Your task is to write a Python script to control a specific BLE device, a "Magic Wand".
 
@@ -103,7 +105,8 @@ This is a macro. The script should build a byte array starting with MACRO_EXECUT
 
 Your final response must contain ONLY the raw Python code inside a single \`\`\`python ... \`\`\` code block. Do not add any conversational text or explanations outside of the code block.`;
       
-      const response = await ai.models.generateContent({
+      // FIX: Use ai.models.generateContent
+const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: `Write a bleak python script for this request: "${prompt}"`,
         config: {
@@ -112,7 +115,8 @@ Your final response must contain ONLY the raw Python code inside a single \`\`\`
       });
 
       // Clean up the response to get only the code
-      const rawText = response.text;
+      // FIX: Use response.text to get the generated text
+const rawText = response.text;
       const codeBlockRegex = /```python\n([\s\S]*?)```/;
       const match = rawText.match(codeBlockRegex);
       const script = match ? match[1] : rawText;
