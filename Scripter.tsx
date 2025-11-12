@@ -34,6 +34,7 @@ const Scripter: React.FC<ScripterProps> = ({ addLog }) => {
   const [generatedScript, setGeneratedScript] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [targetDevice, setTargetDevice] = useState<'wand' | 'box'>('wand');
 
   const handleGenerateScript = useCallback(async () => {
     if (!prompt.trim()) {
@@ -43,18 +44,24 @@ const Scripter: React.FC<ScripterProps> = ({ addLog }) => {
     
     setIsLoading(true);
     setGeneratedScript('');
-    addLog('INFO', `Sending prompt to Gemini: "${prompt}"`);
+    addLog('INFO', `Sending prompt to Gemini for ${targetDevice}: "${prompt}"`);
 
     try {
       // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
 const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
 
-      const systemInstruction = `You are an expert Python developer specializing in Bluetooth Low Energy (BLE) communication using the 'bleak' library. Your task is to write a Python script to control a specific BLE device, a "Magic Wand".
+      const isWand = targetDevice === 'wand';
+      const deviceName = isWand ? "Magic Wand" : "Wand Box";
+      const namePrefix = isWand ? WBDLProtocol.TARGET_NAME : WBDLProtocol.WAND_BOX.TARGET_NAME;
+      const serviceUUID = isWand ? WBDLProtocol.SERVICE_UUID_WAND_CONTROL : WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN;
+      const charUUID = isWand ? WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1 : WBDLProtocol.WAND_BOX.CHAR_UUID_COMM;
+
+      const systemInstruction = `You are an expert Python developer specializing in Bluetooth Low Energy (BLE) communication using the 'bleak' library. Your task is to write a Python script to control a specific BLE device, the "${deviceName}".
 
 # Core BLE Protocol Information
-- Device Name Prefix: "${WBDLProtocol.TARGET_NAME}"
-- Primary Service UUID: "${WBDLProtocol.SERVICE_UUID_WAND_CONTROL}"
-- Command Characteristic UUID (for writing commands): "${WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1}"
+- Device Name Prefix: "${namePrefix}"
+- Primary Service UUID: "${serviceUUID}"
+- Command Characteristic UUID (for writing commands): "${charUUID}"
 
 # Known Commands & Opcodes
 - Simple Commands (sent directly):
@@ -83,12 +90,12 @@ A 'Command' object within a macro variation has the following confirmed properti
 - 'loops': (Integer) The number of times to repeat the command.
 - 'duration': (Double) The duration for the command in milliseconds.
 
-When a user asks to replicate a spell, you must infer a plausible 'macros_payoff' sequence for the 'config_wand' and generate the Python script to send that sequence.
+When a user asks to replicate a spell, you must infer a plausible 'macros_payoff' sequence for the '${isWand ? 'config_wand' : 'config_wandbox'}' and generate the Python script to send that sequence.
 
 # Script Generation Rules
 Based on the user's request, generate a complete, runnable Python script using 'asyncio' and 'bleak'.
 The script MUST:
-1. Scan for the wand by its name prefix.
+1. Scan for the device by its name prefix.
 2. Connect to the first found device.
 3. Find the correct service and characteristic.
 4. Construct the correct byte payload(s) to fulfill the user's request. Use the advanced macro structure if the request implies it (e.g., looping, targeting groups).
@@ -108,7 +115,7 @@ Your final response must contain ONLY the raw Python code inside a single \`\`\`
       // FIX: Use ai.models.generateContent
 const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        contents: `Write a bleak python script for this request: "${prompt}"`,
+        contents: `Write a bleak python script for the ${deviceName} for this request: "${prompt}"`,
         config: {
           systemInstruction: systemInstruction,
         },
@@ -131,7 +138,7 @@ const rawText = response.text;
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, addLog]);
+  }, [prompt, addLog, targetDevice]);
 
   const handleCopy = useCallback(() => {
     if (!generatedScript) return;
@@ -151,18 +158,35 @@ const rawText = response.text;
         <p className="text-sm text-slate-400 mb-4">
           Describe a custom effect or sequence, and Gemini will generate a Python script to control the wand. This is a powerful tool for testing undocumented commands and creating complex effects using loops, colors, and haptics.
         </p>
-        <div className="space-y-2">
-            <label htmlFor="script-prompt" className="block text-sm font-medium text-slate-300">
-                Action Description
-            </label>
-            <textarea
-                id="script-prompt"
-                rows={3}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder='e.g., "Loop a blue pulse 5 times" or "Vibrate for 1 second then fade to red".'
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-            />
+        <div className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">Target Device</label>
+                <div className="flex rounded-lg bg-slate-900 p-1">
+                    <button 
+                        onClick={() => setTargetDevice('wand')} 
+                        className={`flex-1 py-2 text-sm rounded-md transition-colors ${targetDevice === 'wand' ? 'bg-indigo-600 text-white font-semibold' : 'hover:bg-slate-700'}`}>
+                        Wand
+                    </button>
+                    <button 
+                        onClick={() => setTargetDevice('box')} 
+                        className={`flex-1 py-2 text-sm rounded-md transition-colors ${targetDevice === 'box' ? 'bg-indigo-600 text-white font-semibold' : 'hover:bg-slate-700'}`}>
+                        Wand Box
+                    </button>
+                </div>
+            </div>
+            <div>
+              <label htmlFor="script-prompt" className="block text-sm font-medium text-slate-300">
+                  Action Description
+              </label>
+              <textarea
+                  id="script-prompt"
+                  rows={3}
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder='e.g., "Loop a blue pulse 5 times" or "Vibrate for 1 second then fade to red".'
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+              />
+            </div>
             <button
                 onClick={handleGenerateScript}
                 disabled={isLoading}

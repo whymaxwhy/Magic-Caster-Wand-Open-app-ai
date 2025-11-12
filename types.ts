@@ -91,7 +91,13 @@ export type DeviceType = 'wand' | 'box';
 
 export type WandDeviceType = 'WAND' | 'BOX' | 'UNKNOWN';
 
-export type ConnectionState = 'Disconnected' | 'Connecting' | 'Connected' | 'Error';
+// New: ConnectionState enum based on confirmed WandBoxHelper$Companion$WandBoxConnectionState.smali
+export enum ConnectionState {
+  DISCONNECTED = 'Disconnected',
+  CONNECTING = 'Connecting',
+  CONNECTED = 'Connected',
+  ERROR = 'Error',
+}
 
 export const WandTypes = ['ADVENTUROUS', 'DEFIANT', 'HEROIC', 'HONOURABLE', 'LOYAL', 'WISE', 'UNKNOWN'] as const;
 export type WandType = (typeof WandTypes)[number];

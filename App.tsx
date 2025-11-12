@@ -1,10 +1,13 @@
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+
+
+
+import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS } from './constants';
 // FIX: Added RawPacket to the import list from types.ts.
-import { WandTypes, RawPacket } from './types';
-import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, ConnectionState, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds } from './types';
+import { WandTypes, RawPacket, ConnectionState } from './types';
+import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds } from './types';
 import Scripter from './Scripter';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -113,7 +116,7 @@ const ScanIcon = () => (
 const ChartBarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
         {/* FIX: Added spaces around negative numbers and between commands in SVG path to prevent JSX parsing issues. */}
-        <path fillRule="evenodd" d="M3 3a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1H4a1 1 0 0 1 -1 -1V3zm2 12a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1 v -5 a1 1 0 0 1 -1 -1H6a1 1 0 0 1 -1 1v5zm5 -8a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1V7z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M3 3a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1H4a1 1 0 0 1 -1 -1V3zm2 12a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1 v -5 a1 1 0 0 1 -1 -1H6a1 1 0 0 1 -1 1v5zm5 -8a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1 V7z" clipRule="evenodd" />
     </svg>
 );
 const CodeIcon = () => (
@@ -149,18 +152,25 @@ const DocumentSearchIcon = () => (
 const SpinnerIcon = () => (
   <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    {/* FIX: Added space around negative number in SVG path to prevent JSX parsing issues. */}
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 01 8 -8 V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l 3 -2.647z"></path>
   </svg>
 );
 const ExclamationCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M18 10a8 8 0 1 1 -16 0 8 8 0 0 1 16 0zm-7 4a1 1 0 1 1 -2 0 1 1 0 0 1 2 0zm-1-9a1 1 0 0 0 -1 1v4a1 1 0 1 0 2 0V6a1 1 0 0 0 -1 -1z" clipRule="evenodd" />
     </svg>
 );
 const CheckCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
+        <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0 -16 8 8 0 0 0 0 16zm3.707 -9.293a1 1 0 0 0 -1.414 -1.414L9 10.586 7.707 9.293a1 1 0 0 0 -1.414 1.414l2 2a1 1 0 0 0 1.414 0l4 -4z" clipRule="evenodd" />
     </svg>
+);
+const SparklesIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H7v1a1 1 0 01-2 0V6H4a1 1 0 010-2h1V3a1 1 0 011-1zm6 0a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V6h-1a1 1 0 010-2h1V3a1 1 0 011-1zM9 10a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H7a1 1 0 010-2h1v-1a1 1 0 011-1zm6-5a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V8h-1a1 1 0 010-2h1V5a1 1 0 011-1zM5 15a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H4a1 1 0 010-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
+  </svg>
 );
 
 
@@ -173,7 +183,7 @@ interface TutorialModalProps {
 }
 
 const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish }) => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = React.useState(1);
   const totalSteps = 6;
 
   const tutorialSteps = [
@@ -249,9 +259,9 @@ interface LogViewProps {
   logs: LogEntry[];
 }
 const LogView: React.FC<LogViewProps> = ({ logs }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
@@ -285,22 +295,22 @@ interface StatusBadgeProps {
 }
 const StatusBadge: React.FC<StatusBadgeProps> = ({ state }) => {
   const stateConfig = {
-    Connected: {
+    [ConnectionState.CONNECTED]: {
       icon: <CheckCircleIcon />,
       text: 'Connected',
       className: 'bg-green-500/20 text-green-300',
     },
-    Connecting: {
+    [ConnectionState.CONNECTING]: {
       icon: <SpinnerIcon />,
       text: 'Connecting',
       className: 'bg-yellow-500/20 text-yellow-300',
     },
-    Disconnected: {
+    [ConnectionState.DISCONNECTED]: {
       icon: <LinkBreakIcon />,
       text: 'Disconnected',
       className: 'bg-slate-600/50 text-slate-400',
     },
-    Error: {
+    [ConnectionState.ERROR]: {
       icon: <ExclamationCircleIcon />,
       text: 'Error',
       className: 'bg-red-500/20 text-red-300',
@@ -379,114 +389,128 @@ interface WriteQueueItem {
   silent: boolean;
 }
 
+// Type for Live Event state
+type LiveEvent = {
+  message: string;
+  type: 'info' | 'processing' | 'success';
+} | null;
+
+
 // --- MAIN APP ---
 export default function App() {
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logs, setLogs] = React.useState<LogEntry[]>([]);
   
   // --- State Refactor: Using centralized WandDevice object inspired by smali analysis ---
   // Wand State
-  const [wandConnectionState, setWandConnectionState] = useState<ConnectionState>('Disconnected');
-  const [wandDetails, setWandDetails] = useState<WandDevice | null>(null);
-  const [wandBatteryLevel, setWandBatteryLevel] = useState<number | null>(null);
-  const [rawWandProductInfo, setRawWandProductInfo] = useState<string | null>(null);
+  const [wandConnectionState, setWandConnectionState] = React.useState<ConnectionState>(ConnectionState.DISCONNECTED);
+  const [wandDetails, setWandDetails] = React.useState<WandDevice | null>(null);
+  const [wandBatteryLevel, setWandBatteryLevel] = React.useState<number | null>(null);
+  const [rawWandProductInfo, setRawWandProductInfo] = React.useState<string | null>(null);
   
   // Box State
-  const [boxConnectionState, setBoxConnectionState] = useState<ConnectionState>('Disconnected');
-  const [boxDetails, setBoxDetails] = useState<WandDevice | null>(null);
-  const [boxBatteryLevel, setBoxBatteryLevel] = useState<number | null>(null);
-  const [rawBoxProductInfo, setRawBoxProductInfo] = useState<string | null>(null);
+  const [boxConnectionState, setBoxConnectionState] = React.useState<ConnectionState>(ConnectionState.DISCONNECTED);
+  const [boxDetails, setBoxDetails] = React.useState<WandDevice | null>(null);
+  const [boxBatteryLevel, setBoxBatteryLevel] = React.useState<number | null>(null);
+  const [rawBoxProductInfo, setRawBoxProductInfo] = React.useState<string | null>(null);
   
   // Control State
-  const [buttonState, setButtonState] = useState<[boolean, boolean, boolean, boolean]>([false, false, false, false]);
+  const [buttonState, setButtonState] = React.useState<[boolean, boolean, boolean, boolean]>([false, false, false, false]);
   
   // General State
-  const [lastSpell, setLastSpell] = useState<string>('');
-  const [spellDetails, setSpellDetails] = useState<SpellDetails | null>(null);
-  const [isFetchingSpellDetails, setIsFetchingSpellDetails] = useState(false);
-  const [spellDetailsError, setSpellDetailsError] = useState<string | null>(null);
-  const [gestureState, setGestureState] = useState<GestureState>('Idle');
-  const [activeTab, setActiveTab] = useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter'>('control_hub');
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [deviceToScan, setDeviceToScan] = useState<DeviceType | null>(null);
+  const [lastSpell, setLastSpell] = React.useState<string>('');
+  const [spellDetails, setSpellDetails] = React.useState<SpellDetails | null>(null);
+  const [isFetchingSpellDetails, setIsFetchingSpellDetails] = React.useState(false);
+  const [spellDetailsError, setSpellDetailsError] = React.useState<string | null>(null);
+  const [gestureState, setGestureState] = React.useState<GestureState>('Idle');
+  const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter'>('device_manager');
+  const [isScannerOpen, setIsScannerOpen] = React.useState(false);
+  const [deviceToScan, setDeviceToScan] = React.useState<DeviceType | null>(null);
   
-  const [vfxSequence, setVfxSequence] = useState<VfxCommand[]>([]);
-  const [isSequenceSaved, setIsSequenceSaved] = useState(false);
-  const [detectedOpCodes, setDetectedOpCodes] = useState<Set<number>>(new Set());
-  const [rawPacketLog, setRawPacketLog] = useState<RawPacket[]>([]);
-  const [spellBook, setSpellBook] = useState<Spell[]>([]);
-  const [spellFilter, setSpellFilter] = useState('');
+  const [vfxSequence, setVfxSequence] = React.useState<VfxCommand[]>([]);
+  const [isSequenceSaved, setIsSequenceSaved] = React.useState(false);
+  const [detectedOpCodes, setDetectedOpCodes] = React.useState<Set<number>>(new Set());
+  const [rawPacketLog, setRawPacketLog] = React.useState<RawPacket[]>([]);
+  const [spellBook, setSpellBook] = React.useState<Spell[]>([]);
+  const [spellFilter, setSpellFilter] = React.useState('');
   
-  const [isImuStreaming, setIsImuStreaming] = useState(false);
-  const [latestImuData, setLatestImuData] = useState<IMUReading[] | null>(null);
+  const [isImuStreaming, setIsImuStreaming] = React.useState(false);
+  const [latestImuData, setLatestImuData] = React.useState<IMUReading[] | null>(null);
 
   // Smart TV Broadcast State
-  const [isTvBroadcastEnabled, setIsTvBroadcastEnabled] = useState<boolean>(false);
-  const [userHouse, setUserHouse] = useState<House>('GRYFFINDOR');
-  const [userPatronus, setUserPatronus] = useState<string>('Deer');
+  const [isTvBroadcastEnabled, setIsTvBroadcastEnabled] = React.useState<boolean>(false);
+  const [userHouse, setUserHouse] = React.useState<House>('GRYFFINDOR');
+  const [userPatronus, setUserPatronus] = React.useState<string>('Deer');
   
   // Hue Integration State
-  const [isHueEnabled, setIsHueEnabled] = useState(false);
-  const [hueBridgeIp, setHueBridgeIp] = useState('');
-  const [hueUsername, setHueUsername] = useState('');
-  const [hueLightId, setHueLightId] = useState('1');
+  const [isHueEnabled, setIsHueEnabled] = React.useState(false);
+  const [hueBridgeIp, setHueBridgeIp] = React.useState('');
+  const [hueUsername, setHueUsername] = React.useState('');
+  const [hueLightId, setHueLightId] = React.useState('1');
   
   // BLE Explorer State
-  const [explorerDevice, setExplorerDevice] = useState<BluetoothDevice | null>(null);
-  const [explorerServices, setExplorerServices] = useState<ExplorerService[]>([]);
-  const [isExploring, setIsExploring] = useState(false);
+  const [explorerDevice, setExplorerDevice] = React.useState<BluetoothDevice | null>(null);
+  const [explorerServices, setExplorerServices] = React.useState<ExplorerService[]>([]);
+  const [isExploring, setIsExploring] = React.useState(false);
   
   // Diagnostics State
-  const [bleEventLog, setBleEventLog] = useState<BleEvent[]>([]);
-  const [negotiatedMtu, setNegotiatedMtu] = useState<number>(WBDLPayloads.MTU_PAYLOAD_SIZE);
-  const [smaliInput, setSmaliInput] = useState('');
-  const [smaliAnalysis, setSmaliAnalysis] = useState('');
-  const [isAnalyzingSmali, setIsAnalyzingSmali] = useState(false);
+  const [bleEventLog, setBleEventLog] = React.useState<BleEvent[]>([]);
+  const [negotiatedMtu, setNegotiatedMtu] = React.useState<number>(WBDLPayloads.MTU_PAYLOAD_SIZE);
+  const [smaliInput, setSmaliInput] = React.useState('');
+  const [smaliAnalysis, setSmaliAnalysis] = React.useState('');
+  const [isAnalyzingSmali, setIsAnalyzingSmali] = React.useState(false);
   // New: State for Client-Side Gesture Detection, based on n.smali analysis
-  const [isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled] = useState(true);
-  const [gestureThreshold, setGestureThreshold] = useState(2.0); // Default threshold in G's
-  const [clientSideGestureDetected, setClientSideGestureDetected] = useState(false);
-  const [buttonThresholds, setButtonThresholds] = useState<ButtonThresholds[]>([
+  const [isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled] = React.useState(true);
+  const [gestureThreshold, setGestureThreshold] = React.useState(2.0); // Default threshold in G's
+  const [clientSideGestureDetected, setClientSideGestureDetected] = React.useState(false);
+  const [buttonThresholds, setButtonThresholds] = React.useState<ButtonThresholds[]>([
     { min: null, max: null }, { min: null, max: null },
     { min: null, max: null }, { min: null, max: null },
   ]);
   
   // New: State for Spell Compendium
-  const [isCompendiumModalOpen, setIsCompendiumModalOpen] = useState(false);
-  const [selectedCompendiumSpell, setSelectedCompendiumSpell] = useState<string | null>(null);
-  const [compendiumSpellDetails, setCompendiumSpellDetails] = useState<SpellDetails | null>(null);
-  const [isFetchingCompendiumDetails, setIsFetchingCompendiumDetails] = useState(false);
-  const [compendiumError, setCompendiumError] = useState<string | null>(null);
+  const [isCompendiumModalOpen, setIsCompendiumModalOpen] = React.useState(false);
+  const [selectedCompendiumSpell, setSelectedCompendiumSpell] = React.useState<string | null>(null);
+  const [compendiumSpellDetails, setCompendiumSpellDetails] = React.useState<SpellDetails | null>(null);
+  const [isFetchingCompendiumDetails, setIsFetchingCompendiumDetails] = React.useState(false);
+  const [compendiumError, setCompendiumError] = React.useState<string | null>(null);
 
   // New: State for Protocol Settings
-  const [commandDelay_ms, setCommandDelay_ms] = useState(20);
+  const [commandDelay_ms, setCommandDelay_ms] = React.useState(20);
 
   // New: State for Tutorial Modal
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [showTutorial, setShowTutorial] = React.useState(false);
+
+  // New: State for Live Event Indicator, based on SpellGestureHandler.smali analysis
+  const [liveEvent, setLiveEvent] = React.useState<LiveEvent>(null);
 
 
   // --- Command Queue State ---
-  const [writeQueue, setWriteQueue] = useState<WriteQueueItem[]>([]);
-  const isWriting = useRef(false);
+  const [writeQueue, setWriteQueue] = React.useState<WriteQueueItem[]>([]);
+  const isWriting = React.useRef(false);
+  const [boxWriteQueue, setBoxWriteQueue] = React.useState<WriteQueueItem[]>([]);
+  const isBoxWriting = React.useRef(false);
 
-  const logCounter = useRef(0);
-  const bleEventCounter = useRef(0);
-  const commandIdCounter = useRef(0);
-  const rawPacketLogCounter = useRef(0);
-  const keepAliveInterval = useRef<number | null>(null);
-  const commandCharacteristic = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
-  const isInitialMountSpells = useRef(true);
+  const logCounter = React.useRef(0);
+  const bleEventCounter = React.useRef(0);
+  const commandIdCounter = React.useRef(0);
+  const rawPacketLogCounter = React.useRef(0);
+  const keepAliveInterval = React.useRef<number | null>(null);
+  const liveEventTimeout = React.useRef<number | null>(null);
+  const commandCharacteristic = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const boxCommandCharacteristic = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
+  const isInitialMountSpells = React.useRef(true);
   // Fix: Memoize the set of discovered spells with toUpperCase for case-insensitive checking.
-  const discoveredSpells = useMemo(() => new Set(spellBook.map(s => s.name.toUpperCase())), [spellBook]);
+  const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name.toUpperCase())), [spellBook]);
 
   // New: Ref to store macro indices, based on smali reverse engineering
-  const macroIndexes = useRef<Record<string, number>>({});
+  const macroIndexes = React.useRef<Record<string, number>>({});
 
 
-  const addLog = useCallback((type: LogType, message: string) => {
+  const addLog = React.useCallback((type: LogType, message: string) => {
     setLogs(prev => [...prev, { id: logCounter.current++, timestamp: getTimestamp(), type, message }]);
   }, []);
   
-  const addBleEvent = useCallback((event: string, detail: string = '') => {
+  const addBleEvent = React.useCallback((event: string, detail: string = '') => {
       setBleEventLog(prev => {
           const newEntry = { id: bleEventCounter.current++, timestamp: getTimestamp(), event, detail };
           const newLog = [newEntry, ...prev];
@@ -495,7 +519,7 @@ export default function App() {
   }, []);
 
   // Effect to load data from localStorage on initial render
-  useEffect(() => {
+  React.useEffect(() => {
     // Load VFX Sequence
     try {
       const savedSequenceJSON = localStorage.getItem(LOCAL_STORAGE_KEY_VFX);
@@ -568,7 +592,7 @@ export default function App() {
   }, [addLog]);
 
   // New: useEffect to check for tutorial completion on mount
-  useEffect(() => {
+  React.useEffect(() => {
     try {
       const tutorialCompleted = localStorage.getItem(LOCAL_STORAGE_KEY_TUTORIAL);
       if (tutorialCompleted !== 'true') {
@@ -582,7 +606,7 @@ export default function App() {
 
   
   // Effect to auto-save Spell Book when it changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (isInitialMountSpells.current) {
         isInitialMountSpells.current = false;
         return;
@@ -595,7 +619,7 @@ export default function App() {
   }, [spellBook, addLog]);
 
   // Effect to save TV Broadcast settings
-  useEffect(() => {
+  React.useEffect(() => {
     try {
         localStorage.setItem('magicWandTvBroadcastEnabled', JSON.stringify(isTvBroadcastEnabled));
         localStorage.setItem('magicWandUserHouse', userHouse);
@@ -606,7 +630,7 @@ export default function App() {
   }, [isTvBroadcastEnabled, userHouse, userPatronus, addLog]);
   
   // Effect to save Hue settings
-  const saveHueSettings = useCallback(() => {
+  const saveHueSettings = React.useCallback(() => {
     try {
         localStorage.setItem('magicWandHueEnabled', JSON.stringify(isHueEnabled));
         localStorage.setItem('magicWandHueIp', hueBridgeIp);
@@ -620,15 +644,22 @@ export default function App() {
 
 
   // Effect to close scanner modal on successful connection
-  useEffect(() => {
-    if (isScannerOpen && (wandConnectionState === 'Connected' || boxConnectionState === 'Connected')) {
+  React.useEffect(() => {
+    if (!isScannerOpen) {
+      return;
+    }
+
+    if (deviceToScan === 'wand' && wandConnectionState === ConnectionState.CONNECTED) {
+      setIsScannerOpen(false);
+      setDeviceToScan(null);
+    } else if (deviceToScan === 'box' && boxConnectionState === ConnectionState.CONNECTED) {
       setIsScannerOpen(false);
       setDeviceToScan(null);
     }
-  }, [wandConnectionState, boxConnectionState, isScannerOpen]);
+  }, [wandConnectionState, boxConnectionState, isScannerOpen, deviceToScan]);
 
 
-  const fetchSpellDetails = useCallback(async (spellName: string) => {
+  const fetchSpellDetails = React.useCallback(async (spellName: string) => {
     if (!spellName) return;
 
     setIsFetchingSpellDetails(true);
@@ -694,19 +725,19 @@ const jsonText = response.text.trim();
     }
   }, [addLog]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchSpellDetails(lastSpell);
   }, [lastSpell, fetchSpellDetails]);
 
 
-  const clearKeepAlive = useCallback(() => {
+  const clearKeepAlive = React.useCallback(() => {
     if (keepAliveInterval.current) {
       clearInterval(keepAliveInterval.current);
       keepAliveInterval.current = null;
     }
   }, []);
   
-  const sendTvBroadcast = useCallback((spellName: string) => {
+  const sendTvBroadcast = React.useCallback((spellName: string) => {
     if (!isTvBroadcastEnabled) return;
     
     // Sanitize inputs as per smali analysis (remove spaces, lowercase house)
@@ -720,7 +751,7 @@ const jsonText = response.text.trim();
 
   }, [isTvBroadcastEnabled, userHouse, userPatronus, addLog]);
   
-  const handleHueSpell = useCallback((spellName: string) => {
+  const handleHueSpell = React.useCallback((spellName: string) => {
     if (!isHueEnabled || !hueBridgeIp || !hueUsername || !hueLightId) {
         if (isHueEnabled) {
             addLog('WARNING', 'Hue integration is enabled, but settings are incomplete.');
@@ -763,11 +794,11 @@ const jsonText = response.text.trim();
 
   }, [isHueEnabled, hueBridgeIp, hueUsername, hueLightId, addLog]);
 
-  const handleDisconnect = useCallback(() => {
+  const handleDisconnect = React.useCallback(() => {
     if (!wandDetails) return;
     addLog('INFO', `Wand disconnected: ${wandDetails.bleName}`);
     addBleEvent('GATT', 'Disconnected');
-    setWandConnectionState('Disconnected');
+    setWandConnectionState(ConnectionState.DISCONNECTED);
     setWandDetails(null);
     setWandBatteryLevel(null);
     clearKeepAlive();
@@ -782,23 +813,28 @@ const jsonText = response.text.trim();
     // Clear any pending commands on disconnect
     setWriteQueue([]);
     isWriting.current = false;
+    setLiveEvent(null);
+    if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
   }, [addLog, clearKeepAlive, wandDetails, addBleEvent]);
   
-  const handleBoxDisconnect = useCallback(() => {
+  const handleBoxDisconnect = React.useCallback(() => {
     if (!boxDetails) return;
     addLog('INFO', `Wand Box disconnected: ${boxDetails.bleName}`);
     addBleEvent('GATT', 'Box Disconnected');
-    setBoxConnectionState('Disconnected');
+    setBoxConnectionState(ConnectionState.DISCONNECTED);
     setBoxDetails(null);
     setBoxBatteryLevel(null);
     setRawBoxProductInfo(null);
+    boxCommandCharacteristic.current = null;
+    setBoxWriteQueue([]);
+    isBoxWriting.current = false;
   }, [addLog, boxDetails, addBleEvent]);
 
-  const queueCommand = useCallback((payload: Uint8Array, silent: boolean = false) => {
+  const queueCommand = React.useCallback((payload: Uint8Array, silent: boolean = false) => {
     setWriteQueue(prev => [...prev, { payload, silent }]);
   }, []);
 
-  const processWriteQueue = useCallback(async () => {
+  const processWriteQueue = React.useCallback(async () => {
     if (isWriting.current || writeQueue.length === 0) {
       return;
     }
@@ -818,7 +854,7 @@ const jsonText = response.text.trim();
         addBleEvent('Characteristic', `writeValueWithResponse`);
         await commandCharacteristic.current.writeValueWithResponse(itemToWrite.payload);
         if (!itemToWrite.silent) {
-            addLog('DATA_OUT', `Sent: ${bytesToHex(itemToWrite.payload)}`);
+            addLog('DATA_OUT', `Sent to Wand: ${bytesToHex(itemToWrite.payload)}`);
         }
         
         // On success, we start the process for the next item after the specified delay
@@ -837,15 +873,63 @@ const jsonText = response.text.trim();
   }, [writeQueue, addLog, addBleEvent, commandDelay_ms]);
 
   // Effect to drive the write queue
-  useEffect(() => {
-    if (wandConnectionState === 'Connected') {
+  React.useEffect(() => {
+    if (wandConnectionState === ConnectionState.CONNECTED) {
         processWriteQueue();
     }
   }, [writeQueue, wandConnectionState, processWriteQueue]);
 
+  const queueBoxCommand = React.useCallback((payload: Uint8Array, silent: boolean = false) => {
+    setBoxWriteQueue(prev => [...prev, { payload, silent }]);
+  }, []);
+
+  const processBoxWriteQueue = React.useCallback(async () => {
+      if (isBoxWriting.current || boxWriteQueue.length === 0) {
+          return;
+      }
+  
+      isBoxWriting.current = true;
+      const itemToWrite = boxWriteQueue[0];
+  
+      if (!boxCommandCharacteristic.current) {
+          addLog('ERROR', 'Cannot process box write queue: characteristic not available.');
+          addBleEvent('Error', 'Box write failed: No characteristic');
+          isBoxWriting.current = false;
+          setBoxWriteQueue([]);
+          return;
+      }
+  
+      try {
+          addBleEvent('Characteristic', `Box writeValueWithResponse`);
+          await boxCommandCharacteristic.current.writeValueWithResponse(itemToWrite.payload);
+          if (!itemToWrite.silent) {
+              addLog('DATA_OUT', `Sent to Box: ${bytesToHex(itemToWrite.payload)}`);
+          }
+          
+          setTimeout(() => {
+              setBoxWriteQueue(prev => prev.slice(1));
+              isBoxWriting.current = false;
+          }, commandDelay_ms);
+  
+      } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          addLog('ERROR', `Failed to write command to box: ${errorMessage}. Clearing command queue.`);
+          addBleEvent('Error', `Box write failed: ${errorMessage}`);
+          setBoxWriteQueue([]);
+          isBoxWriting.current = false;
+      }
+  }, [boxWriteQueue, addLog, addBleEvent, commandDelay_ms]);
+  
+  // Effect to drive the box write queue
+  React.useEffect(() => {
+      if (boxConnectionState === ConnectionState.CONNECTED) {
+          processBoxWriteQueue();
+      }
+  }, [boxWriteQueue, boxConnectionState, processBoxWriteQueue]);
+
   // New: Parser for individual product info packets, based on `h0.smali` analysis.
   // This replaces the old TLV parser.
-  const handleProductInfoPacket = useCallback((data: Uint8Array, forDevice: 'wand' | 'box') => {
+  const handleProductInfoPacket = React.useCallback((data: Uint8Array, forDevice: 'wand' | 'box') => {
       const updater = forDevice === 'wand' ? setWandDetails : setBoxDetails;
       
       if (data.length < 3) { // Must have opcode, type, and at least one byte of data
@@ -941,7 +1025,7 @@ const jsonText = response.text.trim();
       }
   }, [addLog]);
 
-  const parseStreamData = useCallback((event: Event) => {
+  const parseStreamData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Stream: ${target.uuid.substring(4, 8)})`);
     const value = target.value;
@@ -1001,6 +1085,9 @@ const jsonText = response.text.trim();
             if (data[1] === 0x01) { // Gesture Start
                 setGestureState('Casting');
                 addLog('SUCCESS', 'Gesture started.');
+                // New: Live Event based on SpellGestureHandler.smali confirmation
+                if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+                setLiveEvent({ message: "Gesture Started. Sending 'Ready to Cast' macro.", type: 'info' });
                 // Automatically trigger "Ready to Cast" effect, based on smali analysis of WandHelper
                 addLog('INFO', 'Automatically triggering "Ready to Cast" light effect.');
                 queueCommand(WBDLPayloads.MACRO_READY_TO_CAST_CMD);
@@ -1008,6 +1095,9 @@ const jsonText = response.text.trim();
                 setGestureState('Processing');
                 setClientSideGestureDetected(false); // Reset client-side detector on official stop signal
                 addLog('SUCCESS', 'Gesture stopped. Processing spell...');
+                // New: Live Event based on SpellGestureHandler.smali confirmation
+                if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+                setLiveEvent({ message: 'Gesture Stopped. Awaiting spell result...', type: 'processing' });
             }
         } else {
             addLog('WARNING', 'Malformed Gesture Event packet.');
@@ -1079,6 +1169,11 @@ const jsonText = response.text.trim();
 
           const finalSpellName = normalizeIncomingSpell(cleanedSpellName);
 
+          // New: Live Event for spell decoding and payoff trigger
+          if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+          setLiveEvent({ message: `Spell Decoded! Triggering payoffs.`, type: 'success' });
+          liveEventTimeout.current = window.setTimeout(() => setLiveEvent(null), 4000); // Clear after 4s
+
           addLog('SUCCESS', `SPELL DETECTED: *** ${finalSpellName} *** (Raw: "${cleanedSpellName}", Header: ${headerHex})`);
           setLastSpell(finalSpellName);
           setGestureState('Idle');
@@ -1125,7 +1220,7 @@ const jsonText = response.text.trim();
     }
   }, [addLog, isImuStreaming, queueCommand, sendTvBroadcast, handleHueSpell, addBleEvent, isClientSideGestureDetectionEnabled, gestureState, clientSideGestureDetected, gestureThreshold]);
   
-  const parseControlData = useCallback((event: Event) => {
+  const parseControlData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Control: ${target.uuid.substring(4, 8)})`);
     const value = target.value;
@@ -1139,6 +1234,20 @@ const jsonText = response.text.trim();
       setRawWandProductInfo(prev => `${prev ? prev + '\n' : ''}${getTimestamp()}: ${hexData}`);
       handleProductInfoPacket(data, 'wand');
       return;
+    }
+
+    // New: Handle box address response based on smali analysis
+    if (data.length === 7 && data[0] === WBDLProtocol.INCOMING_OPCODE.BOX_ADDRESS_RESPONSE) {
+        const addressBytes = data.slice(1); // Get the 6 address bytes
+        const macAddress = Array.from(addressBytes)
+            .reverse() // Smali shows address is reversed in payload
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(':')
+            .toUpperCase();
+        
+        setWandDetails(prev => prev ? { ...prev, companionAddress: macAddress } : prev);
+        addLog('SUCCESS', `Received Companion Box Address: ${macAddress}`);
+        return;
     }
     
     // New: Handle button threshold response
@@ -1189,7 +1298,7 @@ const jsonText = response.text.trim();
 
   }, [addLog, addBleEvent, handleProductInfoPacket]);
   
-  const parseBoxData = useCallback((event: Event) => {
+  const parseBoxData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Box: ${target.uuid.substring(4, 8)})`);
     const value = target.value;
@@ -1233,7 +1342,7 @@ const jsonText = response.text.trim();
   }, [addLog, addBleEvent, handleProductInfoPacket]);
 
 
-  const handleBatteryLevel = useCallback((event: Event) => {
+  const handleBatteryLevel = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Battery: ${target.uuid.substring(4, 8)})`);
     const value = target.value;
@@ -1243,7 +1352,7 @@ const jsonText = response.text.trim();
     addLog('INFO', `Wand Battery Level: ${level}%`);
   }, [addLog, addBleEvent]);
   
-  const handleBoxBatteryLevel = useCallback((event: Event) => {
+  const handleBoxBatteryLevel = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
      addBleEvent('Event', `characteristicvaluechanged (Box Battery: ${target.uuid.substring(4, 8)})`);
     const value = target.value;
@@ -1273,14 +1382,14 @@ const jsonText = response.text.trim();
   });
 
 
-  const connectToWand = useCallback(async () => {
+  const connectToWand = React.useCallback(async () => {
     if (!navigator.bluetooth) {
       addLog('ERROR', 'Web Bluetooth API is not available on this browser.');
       addBleEvent('Error', 'Web Bluetooth not available');
-      setWandConnectionState('Error');
+      setWandConnectionState(ConnectionState.ERROR);
       return;
     }
-    setWandConnectionState('Connecting');
+    setWandConnectionState(ConnectionState.CONNECTING);
     addLog('INFO', 'Requesting Wand (MCW) device from browser...');
     addBleEvent('BLE', 'requestDevice (Wand)');
     try {
@@ -1352,7 +1461,7 @@ const jsonText = response.text.trim();
       }
       addBleEvent('Characteristic', 'Notifications started');
 
-      setWandConnectionState('Connected');
+      setWandConnectionState(ConnectionState.CONNECTED);
       addLog('SUCCESS', 'Wand connection fully established!');
 
       // Post-connection setup
@@ -1376,19 +1485,19 @@ const jsonText = response.text.trim();
       const errorMessage = error instanceof Error ? error.message : String(error);
       addLog('ERROR', `Connection failed: ${errorMessage}`);
       addBleEvent('Error', `Connection failed: ${errorMessage}`);
-      setWandConnectionState('Error');
+      setWandConnectionState(ConnectionState.ERROR);
       setWandDetails(null);
     }
   }, [addLog, handleDisconnect, parseControlData, parseStreamData, handleBatteryLevel, queueCommand, addBleEvent]);
 
-  const connectToBox = useCallback(async () => {
+  const connectToBox = React.useCallback(async () => {
     if (!navigator.bluetooth) {
       addLog('ERROR', 'Web Bluetooth API is not available on this browser.');
       addBleEvent('Error', 'Web Bluetooth not available');
-      setBoxConnectionState('Error');
+      setBoxConnectionState(ConnectionState.ERROR);
       return;
     }
-    setBoxConnectionState('Connecting');
+    setBoxConnectionState(ConnectionState.CONNECTING);
     addLog('INFO', 'Requesting Wand Box (MCB) device from browser...');
     addBleEvent('BLE', 'requestDevice (Box)');
     try {
@@ -1412,6 +1521,8 @@ const jsonText = response.text.trim();
       const batteryService = await server.getPrimaryService(WBDLProtocol.WAND_BOX.SERVICE_UUID_BATTERY);
 
       addLog('INFO', 'Discovering Box characteristics...');
+      const commChar = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_COMM);
+      boxCommandCharacteristic.current = commChar;
       const notifyChar = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_NOTIFY);
       const batteryChar = await batteryService.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_BATTERY_LEVEL);
       
@@ -1434,17 +1545,22 @@ const jsonText = response.text.trim();
         addLog('WARNING', 'Box battery characteristic does not support read.');
       }
 
-      setBoxConnectionState('Connected');
+      setBoxConnectionState(ConnectionState.CONNECTED);
       addLog('SUCCESS', 'Wand Box connection fully established!');
+      
+      // New: Request info from the box, as confirmed by smali analysis of WandBoxHelper's `subscribeToBoxInfo`
+      addLog('INFO', 'Requesting firmware and product info from Wand Box...');
+      queueBoxCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
+      queueBoxCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
 
     } catch (error) {
        const errorMessage = error instanceof Error ? error.message : String(error);
       addLog('ERROR', `Box Connection failed: ${errorMessage}`);
       addBleEvent('Error', `Box connection failed: ${errorMessage}`);
-      setBoxConnectionState('Error');
+      setBoxConnectionState(ConnectionState.ERROR);
       setBoxDetails(null);
     }
-  }, [addLog, handleBoxDisconnect, parseBoxData, addBleEvent]);
+  }, [addLog, handleBoxDisconnect, parseBoxData, addBleEvent, queueBoxCommand]);
 
   const addVfxCommand = (type: VfxCommandType) => {
     let params: VfxCommand['params'] = {};
@@ -1486,8 +1602,8 @@ const jsonText = response.text.trim();
     }
   };
   
-  const sendVfxSequence = useCallback(() => {
-    if (wandConnectionState !== 'Connected' || !commandCharacteristic.current) {
+  const sendVfxSequence = React.useCallback(() => {
+    if (wandConnectionState !== ConnectionState.CONNECTED || !commandCharacteristic.current) {
         addLog('ERROR', 'Cannot send VFX sequence: Wand not connected.');
         return;
     }
@@ -1567,7 +1683,7 @@ const jsonText = response.text.trim();
   }, [vfxSequence, addLog, wandConnectionState, queueCommand, negotiatedMtu]);
 
   const toggleImuStream = () => {
-    if (wandConnectionState !== 'Connected') {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
       addLog('ERROR', 'Wand not connected.');
       return;
     }
@@ -1583,8 +1699,8 @@ const jsonText = response.text.trim();
     }
   };
   
-  const handleImuCalibrate = useCallback(() => {
-    if (wandConnectionState !== 'Connected') {
+  const handleImuCalibrate = React.useCallback(() => {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
       addLog('ERROR', 'Wand not connected.');
       return;
     }
@@ -1592,8 +1708,8 @@ const jsonText = response.text.trim();
     queueCommand(WBDLPayloads.IMU_CALIBRATE_CMD);
   }, [wandConnectionState, addLog, queueCommand]);
   
-  const sendButtonThresholds = useCallback((wandType: WandType) => {
-    if (wandConnectionState !== 'Connected') {
+  const sendButtonThresholds = React.useCallback((wandType: WandType) => {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
       addLog('ERROR', 'Wand not connected. Cannot set button thresholds.');
       return;
     }
@@ -1617,8 +1733,8 @@ const jsonText = response.text.trim();
 
   }, [wandConnectionState, addLog, queueCommand]);
   
-  const handleReadButtonThresholds = useCallback(() => {
-    if (wandConnectionState !== 'Connected') {
+  const handleReadButtonThresholds = React.useCallback(() => {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
         addLog('ERROR', 'Wand not connected.');
         return;
     }
@@ -1629,7 +1745,7 @@ const jsonText = response.text.trim();
   }, [wandConnectionState, addLog, queueCommand]);
 
   // When wand type is discovered, automatically send the appropriate thresholds
-  useEffect(() => {
+  React.useEffect(() => {
       if (wandDetails?.wandType && wandDetails.wandType !== 'UNKNOWN') {
           sendButtonThresholds(wandDetails.wandType);
       }
@@ -1682,7 +1798,7 @@ setSmaliAnalysis(response.text);
     }
   };
 
-  const startBleExplorerScan = useCallback(async () => {
+  const startBleExplorerScan = React.useCallback(async () => {
       if (!navigator.bluetooth) {
           addLog('ERROR', 'Web Bluetooth is not available.');
           return;
@@ -1728,13 +1844,21 @@ setSmaliAnalysis(response.text);
       }
   }, [addLog]);
   
-  const sendMacroSequenceFromCommands = useCallback((commands: MacroCommand[]) => {
-    if (wandConnectionState !== 'Connected' || !commandCharacteristic.current) {
-        addLog('ERROR', 'Cannot send macro sequence: Wand not connected.');
+  const sendMacroSequence = React.useCallback((commands: MacroCommand[], target: 'wand' | 'box') => {
+    const isWand = target === 'wand';
+    const connectionState = isWand ? wandConnectionState : boxConnectionState;
+    const char = isWand ? commandCharacteristic.current : boxCommandCharacteristic.current;
+    const queueFn = isWand ? queueCommand : queueBoxCommand;
+    const mtu = isWand ? negotiatedMtu : WBDLPayloads.MTU_PAYLOAD_SIZE;
+    const deviceName = isWand ? "Wand" : "Wand Box";
+
+    if (connectionState !== ConnectionState.CONNECTED || !char) {
+        addLog('ERROR', `Cannot send macro sequence: ${deviceName} not connected.`);
         return;
     }
 
-    addLog('INFO', 'Building and sending spell VFX macro sequence...');
+    addLog('INFO', `Building and sending VFX macro sequence to ${deviceName}...`);
+    // Assumption: The box uses the same MACRO_EXECUTE command prefix as the wand.
     const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
     let hasError = false;
 
@@ -1790,19 +1914,19 @@ setSmaliAnalysis(response.text);
 
     const finalPayload = new Uint8Array(payload);
     
-    if (finalPayload.length > negotiatedMtu) {
-        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${negotiatedMtu} bytes). Splitting into chunks.`);
-        for (let i = 0; i < finalPayload.length; i += negotiatedMtu) {
+    if (finalPayload.length > mtu) {
+        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${mtu} bytes) for ${deviceName}. Splitting into chunks.`);
+        for (let i = 0; i < finalPayload.length; i += mtu) {
             const chunk = finalPayload.slice(i, i + negotiatedMtu);
-            queueCommand(chunk);
+            queueFn(chunk);
         }
     } else {
-        queueCommand(finalPayload);
+        queueFn(finalPayload);
     }
-  }, [addLog, wandConnectionState, queueCommand, negotiatedMtu]);
+  }, [wandConnectionState, boxConnectionState, queueCommand, queueBoxCommand, negotiatedMtu, addLog]);
   
-  const castCompendiumSpell = useCallback((spellDetails: SpellDetails | null) => {
-    if (wandConnectionState !== 'Connected') {
+  const castSpellOnWand = React.useCallback((spellDetails: SpellDetails | null) => {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
         addLog('ERROR', 'Wand not connected.');
         return;
     }
@@ -1811,7 +1935,7 @@ setSmaliAnalysis(response.text);
         return;
     }
 
-    const deviceType = 'WAND'; // Assume WAND for now
+    const deviceType = 'WAND';
 
     const currentIndex = macroIndexes.current[deviceType] ?? -1;
     const nextIndex = (currentIndex + 1) % spellDetails.macros_payoff.length;
@@ -1819,13 +1943,36 @@ setSmaliAnalysis(response.text);
 
     const macroVariation = spellDetails.macros_payoff[nextIndex];
 
-    addLog('INFO', `Casting '${spellDetails.spell_name}'. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
+    addLog('INFO', `Casting '${spellDetails.spell_name}' on Wand. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
 
-    sendMacroSequenceFromCommands(macroVariation);
-  }, [addLog, wandConnectionState, sendMacroSequenceFromCommands]);
+    sendMacroSequence(macroVariation, 'wand');
+  }, [addLog, wandConnectionState, sendMacroSequence]);
+
+  const castSpellOnBox = React.useCallback((spellDetails: SpellDetails | null) => {
+    if (boxConnectionState !== ConnectionState.CONNECTED) {
+        addLog('ERROR', 'Wand Box not connected.');
+        return;
+    }
+    if (!spellDetails || !spellDetails.macros_payoff || spellDetails.macros_payoff.length === 0) {
+        addLog('WARNING', `No macro found for spell ${spellDetails?.spell_name}.`);
+        return;
+    }
+
+    const deviceType = 'BOX';
+
+    const currentIndex = macroIndexes.current[deviceType] ?? -1;
+    const nextIndex = (currentIndex + 1) % spellDetails.macros_payoff.length;
+    macroIndexes.current[deviceType] = nextIndex;
+
+    const macroVariation = spellDetails.macros_payoff[nextIndex];
+
+    addLog('INFO', `Activating '${spellDetails.spell_name}' on Box. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
+
+    sendMacroSequence(macroVariation, 'box');
+  }, [addLog, boxConnectionState, sendMacroSequence]);
 
 
-  const fetchCompendiumDetails = useCallback(async (spellName: string) => {
+  const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
     if (!spellName) return;
     setIsFetchingCompendiumDetails(true);
     setCompendiumError(null);
@@ -1901,13 +2048,13 @@ const jsonText = response.text.trim();
     }
   }, [addLog]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (selectedCompendiumSpell) {
         fetchCompendiumDetails(selectedCompendiumSpell);
     }
   }, [selectedCompendiumSpell, fetchCompendiumDetails]);
   
-  const handleFinishTutorial = useCallback(() => {
+  const handleFinishTutorial = React.useCallback(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY_TUTORIAL, 'true');
       setShowTutorial(false);
@@ -1918,7 +2065,7 @@ const jsonText = response.text.trim();
     }
   }, [addLog]);
 
-  const handleResetTutorial = useCallback(() => {
+  const handleResetTutorial = React.useCallback(() => {
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY_TUTORIAL);
       setShowTutorial(true);
@@ -1927,12 +2074,45 @@ const jsonText = response.text.trim();
       addLog('ERROR', `Failed to reset tutorial status: ${error}`);
     }
   }, [addLog]);
+  
+  const handleUnlockAllSpells = React.useCallback(() => {
+    addLog('INFO', 'Unlocking all spells...');
+    const discoveredNames = new Set(spellBook.map(s => s.name));
+    const spellsToUnlock = SPELL_LIST
+        .filter(name => !discoveredNames.has(name))
+        .map(name => ({ name, firstSeen: new Date().toISOString() }));
+
+    if (spellsToUnlock.length > 0) {
+        setSpellBook(prevBook => [...prevBook, ...spellsToUnlock]);
+        addLog('SUCCESS', `Unlocked ${spellsToUnlock.length} new spells!`);
+    } else {
+        addLog('INFO', 'All spells were already unlocked.');
+    }
+  }, [spellBook, addLog]);
+  
+  const handleSendBoxTestMacro = React.useCallback(() => {
+    addLog('INFO', 'Sending test macro to Wand Box...');
+    const testMacro: MacroCommand[] = [
+        { command: 'LightTransition', color: '#0000FF', duration: 500, group: 0 },
+        { command: 'MacroDelay', duration: 200 },
+        { command: 'LightTransition', color: '#000000', duration: 500, group: 0 },
+    ];
+    sendMacroSequence(testMacro, 'box');
+  }, [addLog, sendMacroSequence]);
+
+  const handleRequestBoxAddress = React.useCallback(() => {
+    if (wandConnectionState !== ConnectionState.CONNECTED) {
+        addLog('ERROR', 'Wand not connected.');
+        return;
+    }
+    addLog('INFO', 'Requesting companion box address from wand...');
+    queueCommand(WBDLPayloads.BOX_ADDRESS_REQUEST_CMD);
+  }, [wandConnectionState, addLog, queueCommand]);
 
 
 
   // --- RENDER ---
   
-  // FIX: Added 'key' prop to TabButton component to fix React warning and potential rendering issues.
   const renderTab = () => {
     switch (activeTab) {
       case 'control_hub': return <ControlHub 
@@ -1950,6 +2130,7 @@ const jsonText = response.text.trim();
         saveVfxSequence={saveVfxSequence}
         isSequenceSaved={isSequenceSaved}
         wandConnectionState={wandConnectionState}
+        liveEvent={liveEvent}
       />;
       case 'device_manager': return <DeviceManager 
           wandConnectionState={wandConnectionState}
@@ -1981,6 +2162,8 @@ const jsonText = response.text.trim();
           commandDelay_ms={commandDelay_ms}
           setCommandDelay_ms={setCommandDelay_ms}
           onResetTutorial={handleResetTutorial}
+          onSendBoxTestMacro={handleSendBoxTestMacro}
+          onRequestBoxAddress={handleRequestBoxAddress}
       />;
       case 'diagnostics': return <Diagnostics 
         detectedOpCodes={detectedOpCodes}
@@ -2012,6 +2195,7 @@ const jsonText = response.text.trim();
               setSelectedCompendiumSpell(spell);
               setIsCompendiumModalOpen(true);
           }}
+          onUnlockAll={handleUnlockAllSpells}
       />;
       case 'explorer': return <BleExplorer 
           onScan={startBleExplorerScan}
@@ -2060,8 +2244,10 @@ const jsonText = response.text.trim();
               spellDetails={compendiumSpellDetails}
               isLoading={isFetchingCompendiumDetails}
               error={compendiumError}
-              onCast={castCompendiumSpell}
-              isWandConnected={wandConnectionState === 'Connected'}
+              onCastOnWand={castSpellOnWand}
+              onCastOnBox={castSpellOnBox}
+              isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
+              isBoxConnected={boxConnectionState === ConnectionState.CONNECTED}
           />
         </Modal>
       )}
@@ -2076,12 +2262,13 @@ const jsonText = response.text.trim();
             <div className="flex-shrink-0 bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <h2 className="text-lg font-semibold mb-3">Navigation</h2>
                 <div className="flex flex-col gap-2">
-                    <TabButton Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
-                    <TabButton Icon={CubeIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
-                    <TabButton Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
-                    <TabButton Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
-                    <TabButton Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
-                    <TabButton Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />
+                    {/* FIX: Added 'key' prop to TabButton component to fix React warning and potential rendering issues. */}
+                    <TabButton key="control_hub" Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
+                    <TabButton key="device_manager" Icon={CubeIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
+                    <TabButton key="diagnostics" Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
+                    <TabButton key="compendium" Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
+                    <TabButton key="explorer" Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
+                    <TabButton key="scripter" Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />
                 </div>
             </div>
             <div className="flex-grow min-h-0">
@@ -2149,9 +2336,10 @@ interface ControlHubProps {
   saveVfxSequence: () => void;
   isSequenceSaved: boolean;
   wandConnectionState: ConnectionState;
+  liveEvent: LiveEvent;
 }
 
-const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, clientSideGestureDetected, spellDetails, isFetchingSpellDetails, spellDetailsError, vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved, wandConnectionState }) => {
+const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, clientSideGestureDetected, spellDetails, isFetchingSpellDetails, spellDetailsError, vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved, wandConnectionState, liveEvent }) => {
     return (
         <div className="flex flex-col h-full space-y-4">
             <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2161,7 +2349,7 @@ const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, client
                         <span className="font-bold mr-2">Last Spell:</span>
                         <span className="text-indigo-400 font-mono">{lastSpell || 'N/A'}</span>
                     </div>
-                     <div className="flex items-center text-lg">
+                     <div className="flex items-center text-lg mb-3">
                         <span className="font-bold mr-2">Gesture:</span>
                         <span className={`px-2 py-1 rounded text-sm ${
                             gestureState === 'Idle' ? 'bg-slate-600' :
@@ -2171,6 +2359,22 @@ const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, client
                             <span className="ml-2 px-2 py-1 rounded text-xs bg-green-500/30 text-green-300 animate-pulse">
                                 Client Motion Detected
                             </span>
+                        )}
+                    </div>
+                    {/* New: Live Event Indicator based on smali analysis */}
+                    <div className="mt-2 pt-3 border-t border-slate-700">
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Live Event</h4>
+                        {liveEvent ? (
+                            <div className={`p-2 rounded text-sm font-mono flex items-center animate-fade-in ${
+                                liveEvent.type === 'info' ? 'bg-blue-900/50 text-blue-300' :
+                                liveEvent.type === 'processing' ? 'bg-purple-900/50 text-purple-300' :
+                                'bg-green-900/50 text-green-300'
+                            }`}>
+                                <span className="animate-ping h-2 w-2 rounded-full bg-current opacity-75 mr-3"></span>
+                                <span>{liveEvent.message}</span>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-slate-500">Idle</p>
                         )}
                     </div>
                 </div>
@@ -2185,22 +2389,57 @@ const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, client
                     sendSequence={sendVfxSequence}
                     saveSequence={saveVfxSequence}
                     isSaved={isSequenceSaved}
-                    isConnected={wandConnectionState === 'Connected'}
+                    isConnected={wandConnectionState === ConnectionState.CONNECTED}
                 />
             </div>
         </div>
     );
 };
 
+const LumosGestureIcon = () => (
+    <svg viewBox="0 0 100 120" className="w-24 h-30 mx-auto">
+      {/* Main gesture path */}
+      <path
+        d="M 10 110 L 50 10 L 90 110"
+        stroke="white"
+        strokeWidth="5"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Start circle */}
+      <circle cx="10" cy="110" r="6" fill="white" />
+      
+      {/* Left arrow. Positioned at (30,60), rotated to point down-left. */}
+      <g transform="translate(30, 60) rotate(135)">
+        <path d="M -8 0 L 0 8 L 8 0" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+  
+      {/* Right arrow. Positioned at (70,60), rotated to point down-right. */}
+      <g transform="translate(70, 60) rotate(45)">
+        <path d="M -8 0 L 0 8 L 8 0" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+);
+
 interface SpellDetailsCardProps {
     spellDetails: SpellDetails | null;
     isLoading: boolean;
     error: string | null;
-    onCast?: (spellDetails: SpellDetails) => void;
+    onCastOnWand?: (spellDetails: SpellDetails) => void;
+    onCastOnBox?: (spellDetails: SpellDetails) => void;
     isWandConnected?: boolean;
+    isBoxConnected?: boolean;
 }
 
-const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoading, error, onCast, isWandConnected }) => {
+const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoading, error, onCastOnWand, onCastOnBox, isWandConnected, isBoxConnected }) => {
+    const [selectedMacroIndex, setSelectedMacroIndex] = React.useState(0);
+
+    React.useEffect(() => {
+        // Reset to the first macro variation when the spell details change
+        setSelectedMacroIndex(0);
+    }, [spellDetails]);
+    
     if (isLoading) {
         return (
             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 animate-pulse">
@@ -2233,13 +2472,22 @@ const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoa
       borderColor: spellDetails.spell_background_color || '#475569', // Default slate-600
       borderWidth: '1px',
     };
+    
+    const formatMacroParams = (cmd: MacroCommand) => {
+        const params = [];
+        if (cmd.color) params.push(`color: ${cmd.color}`);
+        if (cmd.duration) params.push(`duration: ${cmd.duration}ms`);
+        if (cmd.group) params.push(`group: ${cmd.group}`);
+        if (cmd.loops) params.push(`loops: ${cmd.loops}`);
+        return params.join(', ');
+    };
 
     return (
         <div className="bg-slate-900/50 p-4 rounded-lg" style={cardStyle}>
             <h3 className="text-xl font-semibold" style={{ color: spellDetails.spell_background_color }}>{spellDetails.spell_name}</h3>
             <p className="text-sm italic text-slate-400 mb-2">"{spellDetails.incantation_name}" - {spellDetails.spell_type}</p>
             <p className="text-slate-300 text-sm mb-3">{spellDetails.description}</p>
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-xs mb-3">
                  <div className="flex gap-2">
                     {spellDetails.spell_uses.map(use => (
                         <span key={use.id} className="bg-slate-700 px-2 py-1 rounded-full">{use.icon}</span>
@@ -2251,16 +2499,65 @@ const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoa
                     ))}
                 </div>
             </div>
-            {onCast && spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-slate-600">
-                    <button 
-                        onClick={() => onCast(spellDetails)}
-                        disabled={!isWandConnected}
-                        className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
-                        title={!isWandConnected ? 'Connect wand to cast spell' : 'Execute spell VFX on wand'}
-                    >
-                        Cast Spell
-                    </button>
+
+            {spellDetails.spell_name.toUpperCase() === 'LUMOS' && (
+                <div className="my-3">
+                    <h4 className="text-sm font-semibold text-slate-400 text-center mb-2">Spell Gesture</h4>
+                    <div className="bg-slate-950 p-2 rounded-lg border border-slate-700">
+                        <LumosGestureIcon />
+                    </div>
+                </div>
+            )}
+
+            {spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
+                <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-slate-400">VFX Macro</h4>
+                    {spellDetails.macros_payoff.length > 1 && (
+                        <div className="flex gap-1 bg-slate-800 p-1 rounded-md">
+                            {spellDetails.macros_payoff.map((_, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => setSelectedMacroIndex(index)}
+                                    className={`flex-1 text-xs px-2 py-1 rounded ${selectedMacroIndex === index ? 'bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}
+                                >
+                                    Var {index + 1}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                     <div className="space-y-1 bg-slate-950 p-2 rounded-md max-h-24 overflow-y-auto">
+                        {spellDetails.macros_payoff[selectedMacroIndex]?.map((cmd, cmdIndex) => (
+                            <div key={cmdIndex} className="text-xs font-mono flex justify-between">
+                                <span className="text-cyan-400">{cmd.command}</span>
+                                <span className="text-slate-400">{formatMacroParams(cmd)}</span>
+                            </div>
+                        )) || <p className="text-xs text-slate-500">No commands in this variation.</p>}
+                    </div>
+                </div>
+            )}
+
+            {(onCastOnWand || onCastOnBox) && spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-600 flex flex-col sm:flex-row gap-2">
+                    {onCastOnWand && 
+                        <button 
+                            onClick={() => onCastOnWand(spellDetails)}
+                            disabled={!isWandConnected}
+                            className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
+                            title={!isWandConnected ? 'Connect wand to cast spell' : 'Execute spell VFX on wand'}
+                        >
+                            Cast on Wand
+                        </button>
+                    }
+                    {onCastOnBox &&
+                        <button 
+                            onClick={() => onCastOnBox(spellDetails)}
+                            disabled={!isBoxConnected}
+                            className="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
+                            title={!isBoxConnected ? 'Connect wand box to activate' : 'Execute spell VFX on box'}
+                        >
+                            Activate on Box
+                        </button>
+                    }
                 </div>
             )}
         </div>
@@ -2462,9 +2759,11 @@ interface DeviceManagerProps {
   commandDelay_ms: number;
   setCommandDelay_ms: (delay: number) => void;
   onResetTutorial: () => void;
+  onSendBoxTestMacro: () => void;
+  onRequestBoxAddress: () => void;
 }
 
-const DeviceManager: React.FC<DeviceManagerProps> = ({ wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel, onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled, setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled, setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId, setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial }) => {
+const DeviceManager: React.FC<DeviceManagerProps> = ({ wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel, onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled, setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled, setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId, setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial, onSendBoxTestMacro, onRequestBoxAddress }) => {
     return (
         <div className="space-y-6 h-full overflow-y-auto pr-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2477,6 +2776,7 @@ const DeviceManager: React.FC<DeviceManagerProps> = ({ wandConnectionState, boxC
                     rawProductInfo={rawWandProductInfo}
                     wandDetails={wandDetails}
                     boxDetails={boxDetails}
+                    onRequestBoxAddress={onRequestBoxAddress}
                 />
                 <DeviceCard 
                     title="Wand Box" 
@@ -2484,13 +2784,13 @@ const DeviceManager: React.FC<DeviceManagerProps> = ({ wandConnectionState, boxC
                     details={boxDetails} 
                     batteryLevel={boxBatteryLevel}
                     onConnect={onConnectBox}
-// FIX: Corrected typo. It should be rawBoxProductInfo, not rawProductInfo.
                     rawProductInfo={rawBoxProductInfo}
                     wandDetails={wandDetails}
                     boxDetails={boxDetails}
+                    onSendTestMacro={onSendBoxTestMacro}
                 />
             </div>
-            {wandConnectionState === 'Connected' && (
+            {wandConnectionState === ConnectionState.CONNECTED && (
                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
                     <h3 className="text-xl font-semibold mb-3">Protocol Settings</h3>
                      <div className="space-y-2">
@@ -2602,10 +2902,12 @@ interface DeviceCardProps {
     rawProductInfo: string | null;
     wandDetails: WandDevice | null;
     boxDetails: WandDevice | null;
+    onSendTestMacro?: () => void;
+    onRequestBoxAddress?: () => void;
 }
 
-const DeviceCard: React.FC<DeviceCardProps> = ({ title, connectionState, details, batteryLevel, onConnect, rawProductInfo, wandDetails, boxDetails }) => {
-    const isConnected = connectionState === 'Connected';
+const DeviceCard: React.FC<DeviceCardProps> = ({ title, connectionState, details, batteryLevel, onConnect, rawProductInfo, wandDetails, boxDetails, onSendTestMacro, onRequestBoxAddress }) => {
+    const isConnected = connectionState === ConnectionState.CONNECTED;
     
     return (
         <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
@@ -2617,7 +2919,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ title, connectionState, details
                 </div>
             </div>
             {isConnected && details ? (
-                <DeviceDetailsCard device={details} rawProductInfo={rawProductInfo} wandDetails={wandDetails} boxDetails={boxDetails} />
+                <DeviceDetailsCard device={details} rawProductInfo={rawProductInfo} wandDetails={wandDetails} boxDetails={boxDetails} onSendBoxMacro={onSendTestMacro} onRequestBoxAddress={onRequestBoxAddress} />
             ) : (
                  <div className="text-center py-8">
                     <p className="text-slate-400 mb-4">Device is not connected.</p>
@@ -2630,7 +2932,16 @@ const DeviceCard: React.FC<DeviceCardProps> = ({ title, connectionState, details
     );
 };
 
-const DeviceDetailsCard: React.FC<{device: WandDevice, rawProductInfo: string | null, wandDetails: WandDevice | null, boxDetails: WandDevice | null}> = ({ device, rawProductInfo, wandDetails, boxDetails }) => {
+interface DeviceDetailsCardProps {
+    device: WandDevice;
+    rawProductInfo: string | null;
+    wandDetails: WandDevice | null;
+    boxDetails: WandDevice | null;
+    onSendBoxMacro?: () => void;
+    onRequestBoxAddress?: () => void;
+}
+
+const DeviceDetailsCard: React.FC<DeviceDetailsCardProps> = ({ device, rawProductInfo, wandDetails, boxDetails, onSendBoxMacro, onRequestBoxAddress }) => {
     return (
         <div className="space-y-2 text-sm">
             <InfoRow label="BLE Name" value={device.bleName} />
@@ -2655,6 +2966,36 @@ const DeviceDetailsCard: React.FC<{device: WandDevice, rawProductInfo: string | 
                 </div>
             )}
             {rawProductInfo && <InfoRow label="Raw Prod Info" value={rawProductInfo} isMono />}
+
+            {device.deviceType === 'WAND' && onRequestBoxAddress && (
+                <div className="pt-3 mt-2 border-t border-slate-700">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h4 className="font-semibold text-slate-300">Companion Link</h4>
+                            <p className="text-xs text-slate-400">Request Box MAC address from Wand.</p>
+                        </div>
+                        <button
+                            onClick={onRequestBoxAddress}
+                            className="px-3 py-1 text-xs rounded bg-slate-600 hover:bg-slate-500"
+                        >
+                            Request
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {device.deviceType === 'BOX' && onSendBoxMacro && (
+                <div className="pt-3 mt-2 border-t border-slate-700">
+                    <h4 className="font-semibold text-slate-300 mb-2">Direct Macro Test</h4>
+                    <p className="text-xs text-slate-400 mb-3">Test the box's ability to run VFX sequences, confirmed by smali analysis of the WandBoxHelper.</p>
+                    <button 
+                        onClick={onSendBoxMacro}
+                        className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold text-sm"
+                    >
+                        Send 'Blue Pulse' Test
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
@@ -2713,7 +3054,7 @@ interface SpellBookProps {
 }
 
 const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, discoveredCount, totalCount, spellFilter, setSpellFilter }) => {
-    const filteredSpells = useMemo(() => {
+    const filteredSpells = React.useMemo(() => {
         return SPELL_LIST
             .map(name => ({ name, discovered: discoveredSpells.has(name.toUpperCase()) }))
             .filter(spell => spell.name.toLowerCase().includes(spellFilter.toLowerCase()))
@@ -2780,8 +3121,8 @@ interface DiagnosticsProps {
 }
 
 const Diagnostics: React.FC<DiagnosticsProps> = ({ detectedOpCodes, rawPacketLog, bleEventLog, isImuStreaming, toggleImuStream, handleImuCalibrate, latestImuData, buttonState, smaliInput, setSmaliInput, analyzeSmaliWithGemini, isAnalyzingSmali, smaliAnalysis, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled, gestureThreshold, setGestureThreshold, clientSideGestureDetected, buttonThresholds, handleReadButtonThresholds, wandConnectionState, queueCommand }) => {
-    const sortedOpcodes = useMemo(() => Array.from(detectedOpCodes).sort((a, b) => a - b), [detectedOpCodes]);
-    const isWandConnected = wandConnectionState === 'Connected';
+    const sortedOpcodes = React.useMemo(() => Array.from(detectedOpCodes).sort((a, b) => a - b), [detectedOpCodes]);
+    const isWandConnected = wandConnectionState === ConnectionState.CONNECTED;
     
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -2838,13 +3179,12 @@ const Diagnostics: React.FC<DiagnosticsProps> = ({ detectedOpCodes, rawPacketLog
                                 <div className="flex justify-between items-center">
                                     <span>Enable Detector:</span>
                                     <div className="relative inline-block w-10 ml-2 align-middle select-none">
-                                        {/* FIX: The style attribute on this input was malformed, causing a JSX parsing error. It has been corrected to a valid React style object. This type of error often manifests as an arithmetic operation error when the parser misinterprets parts of the style string. */}
+                                        {/* FIX: Replaced an inline style attribute with a Tailwind CSS utility class. The original inline style was causing a JSX parsing error that manifested as an arithmetic operation error. */}
                                         <input
                                             type="checkbox"
                                             checked={isClientSideGestureDetectionEnabled}
                                             onChange={(e) => setIsClientSideGestureDetectionEnabled(e.target.checked)}
                                             className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                                            style={{ right: '0.25rem' }}
                                         />
                                         <label className="toggle-label block overflow-hidden h-5 rounded-full bg-slate-600 cursor-pointer"></label>
                                     </div>
@@ -2897,76 +3237,86 @@ const Diagnostics: React.FC<DiagnosticsProps> = ({ detectedOpCodes, rawPacketLog
                         <div>
                             <h5 className="text-sm font-semibold text-slate-400 mb-2">Predefined Macros (Guesses)</h5>
                             <div className="grid grid-cols-2 gap-2 text-sm">
-                                {Object.entries(WBDLProtocol.PREDEFINED_MACRO_ID).map(([name, id]) => (
-                                    <button 
-                                        key={name}
-                                        onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, id as number]))}
-                                        className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-xs capitalize"
-                                        disabled={!isWandConnected}
-                                        title={`Execute Macro ID: 0x${(id as number).toString(16).padStart(2, '0')}`}
-                                    >
-                                        {name.replace(/_/g, ' ').toLowerCase()}
-                                    </button>
-                                ))}
+                                <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.PAIRING]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
+                                    Pairing Effect
+                                </button>
+                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.READY_TO_CAST_NO_HAPTIC]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
+                                    Ready To Cast
+                                </button>
+                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.GENERIC_ERROR]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
+                                    Error Effect
+                                </button>
+                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.AGUAMENTI]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
+                                    Aguamenti
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col min-h-0">
-                        <h4 className="font-semibold mb-2">BLE Event Log</h4>
-                        <div className="flex-grow bg-slate-950 rounded p-2 text-xs font-mono overflow-y-auto border border-slate-600">
-                            {bleEventLog.map((e: BleEvent) => (
-                                <div key={e.id} className="whitespace-nowrap">
-                                    <span className="text-slate-500">{e.timestamp} </span>
-                                    <span className="text-cyan-400 font-bold">[{e.event}] </span>
-                                    <span className="text-slate-300">{e.detail}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
+
                 <div className="flex flex-col gap-4 min-h-0">
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                        <h4 className="font-semibold mb-2">OpCode Discovery</h4>
-                        <p className="text-xs text-slate-400 mb-2">Unknown opcodes from CH1/CH2 will appear here.</p>
-                        <div className="bg-slate-800 p-2 rounded text-sm font-mono flex flex-wrap gap-2">
-                            {sortedOpcodes.length > 0 ? (
-                                sortedOpcodes.map(code => (
-                                    <span key={code} className="bg-slate-700 px-2 py-1 rounded">0x{code.toString(16).padStart(2, '0')}</span>
-                                ))
-                            ) : (
-                                <span className="text-slate-500">None detected yet.</span>
-                            )}
-                        </div>
+                     <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-shrink-0">
+                        <h4 className="font-semibold mb-2">Detected Opcodes (Incoming)</h4>
+                        {sortedOpcodes.length > 0 ? (
+                           <div className="flex flex-wrap gap-2">
+                                {sortedOpcodes.map(code => (
+                                    <span key={code} className="font-mono bg-slate-700 px-2 py-1 rounded-full text-xs">0x{code.toString(16).padStart(2, '0')}</span>
+                                ))}
+                           </div>
+                        ) : (
+                           <p className="text-sm text-slate-500">No unknown opcodes detected yet. Interact with the wand to discover them.</p>
+                        )}
                     </div>
+                    
                     <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col min-h-0">
-                        <h4 className="font-semibold mb-2">Raw Packet Log (CH1/CH2)</h4>
-                        <div className="flex-grow bg-slate-950 rounded p-2 text-xs font-mono overflow-y-auto border border-slate-600">
-                            {rawPacketLog.map((p: RawPacket) => (
-                                <div key={p.id} className="whitespace-nowrap">
-                                    <span className="text-slate-500">{p.timestamp} </span>
-                                    <span className="text-purple-400">{p.hexData}</span>
+                        <h4 className="font-semibold mb-2">Raw Packet Log</h4>
+                        <div className="flex-grow bg-slate-950 rounded p-2 overflow-y-auto font-mono text-xs">
+                           {rawPacketLog.map(p => (
+                                <div key={p.id}>
+                                    <span className="text-slate-500">{p.timestamp}</span> <span className="text-purple-400">{p.hexData}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col min-h-0">
-                         <h4 className="font-semibold mb-2">Smali Analyzer (via Gemini)</h4>
-                         <textarea 
-                             className={`w-full bg-slate-950 border border-slate-600 rounded p-2 font-mono text-xs transition-all ${smaliAnalysis ? 'flex-shrink h-24' : 'flex-grow'}`}
-                             placeholder="Paste smali code here..."
-                             value={smaliInput}
-                             onChange={(e) => setSmaliInput(e.target.value)}
-                         ></textarea>
-                         <button onClick={analyzeSmaliWithGemini} disabled={isAnalyzingSmali} className="mt-2 w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 flex-shrink-0">
-                             {isAnalyzingSmali ? 'Analyzing...' : 'Analyze Smali'}
-                         </button>
-                         {smaliAnalysis && (
-                             <div className="mt-2 flex-grow bg-slate-950 rounded p-2 text-xs overflow-y-auto border border-slate-600 prose prose-invert prose-sm">
-                                 <pre className="whitespace-pre-wrap">{smaliAnalysis}</pre>
-                             </div>
-                         )}
-                    </div>
                 </div>
+
+                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col md:col-span-2 min-h-0">
+                     <h4 className="font-semibold mb-2">Smali Analyzer (via Gemini)</h4>
+                     <p className="text-sm text-slate-400 mb-3">Paste smali code from the app's decompiled source to get an analysis of its BLE protocol logic.</p>
+                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
+                         <div className="flex flex-col">
+                             <textarea 
+                                value={smaliInput}
+                                onChange={e => setSmaliInput(e.target.value)}
+                                placeholder="Paste smali code here..."
+                                className="w-full flex-grow bg-slate-950 border border-slate-600 rounded-lg p-2 font-mono text-xs resize-none"
+                             />
+                             <button onClick={analyzeSmaliWithGemini} disabled={isAnalyzingSmali} className="w-full mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500">
+                                 {isAnalyzingSmali ? 'Analyzing...' : 'Analyze with Gemini'}
+                             </button>
+                         </div>
+                         <div className="bg-slate-950 rounded-lg border border-slate-600 p-4 overflow-y-auto">
+                            {isAnalyzingSmali ? (
+                                <p className="text-slate-400 animate-pulse">Gemini is thinking...</p>
+                            ) : (
+                                <div className="prose prose-sm prose-invert" dangerouslySetInnerHTML={{ __html: smaliAnalysis || '<p class="text-slate-500">Analysis will appear here.</p>' }}></div>
+                            )}
+                         </div>
+                     </div>
+                 </div>
+
+                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 md:col-span-2">
+                     <h4 className="font-semibold mb-2">BLE Event Log</h4>
+                      <div className="h-48 bg-slate-950 rounded p-2 overflow-y-auto font-mono text-xs">
+                         {bleEventLog.map(e => (
+                             <div key={e.id}>
+                                 <span className="text-slate-500">{e.timestamp}</span>
+                                 <span className="text-cyan-400 font-bold"> [{e.event}] </span>
+                                 <span className="text-slate-300">{e.detail}</span>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
             </div>
         </div>
     );
@@ -2975,78 +3325,59 @@ const Diagnostics: React.FC<DiagnosticsProps> = ({ detectedOpCodes, rawPacketLog
 interface SpellCompendiumProps {
     spellBook: Spell[];
     onSelectSpell: (spellName: string) => void;
+    onUnlockAll: () => void;
 }
 
-const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, onSelectSpell }) => {
+const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, onSelectSpell, onUnlockAll }) => {
+    const [filter, setFilter] = React.useState('');
+
+    const filteredSpells = React.useMemo(() => {
+        return SPELL_LIST
+            .filter(name => name.toLowerCase().includes(filter.toLowerCase()))
+            .sort((a, b) => a.localeCompare(b));
+    }, [filter]);
+
     return (
-        <div className="h-full flex flex-col space-y-4">
-             <h3 className="text-xl font-semibold">Spell Compendium</h3>
-             <p className="text-sm text-slate-400">
-                 Explore detailed information about every known spell. Select a spell to view its properties, effects, and cast its unique VFX sequence directly on your wand.
-             </p>
-             <div className="flex-grow overflow-y-auto pr-2">
-                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                     {SPELL_LIST.sort().map(spellName => (
-                         <button
-                             key={spellName}
-                             onClick={() => onSelectSpell(spellName)}
-                             className="p-4 bg-slate-900/50 rounded-lg border border-slate-700 text-center hover:bg-slate-700 hover:border-indigo-500 transition-all duration-200"
-                         >
-                             <span className="font-semibold text-slate-300">{spellName.replace(/_/g, ' ')}</span>
-                         </button>
-                     ))}
-                 </div>
-             </div>
-        </div>
-    )
-}
-
-interface BleExplorerProps {
-    onScan: () => void;
-    isExploring: boolean;
-    device: BluetoothDevice | null;
-    services: ExplorerService[];
-}
-
-const BleExplorer: React.FC<BleExplorerProps> = ({ onScan, isExploring, device, services }) => {
-    return (
-        <div className="h-full flex flex-col space-y-4">
-             <h3 className="text-xl font-semibold">BLE Services Explorer</h3>
-             <p className="text-sm text-slate-400">
-                 Scan for any nearby BLE device and inspect its services and characteristics. This is a low-level tool for exploring the capabilities of any device, not just the wand.
-             </p>
-             <button
-                onClick={onScan}
-                disabled={isExploring}
-                className="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-wait"
-            >
-                {isExploring ? 'Scanning...' : 'Scan for any BLE Device'}
-            </button>
-            {device && (
-                <div className="flex-grow bg-slate-900/50 p-4 rounded-lg border border-slate-700 overflow-y-auto">
-                    <h4 className="font-semibold text-lg mb-2">Device: <span className="text-indigo-400">{device.name || device.id}</span></h4>
-                    <div className="space-y-4">
-                        {services.length > 0 ? services.map(service => (
-                            <div key={service.uuid} className="bg-slate-800 p-3 rounded-lg">
-                                <p className="font-semibold text-green-400 font-mono text-sm">Service: {service.uuid}</p>
-                                <ul className="mt-2 space-y-1 pl-4">
-                                    {service.characteristics.map(char => (
-                                        <li key={char.uuid} className="font-mono text-xs text-slate-300">
-                                            <p>Characteristic: {char.uuid}</p>
-                                            <p className="text-slate-400 pl-2">
-                                                Properties: {Object.entries(char.properties)
-                                                    .filter(([, value]) => value)
-                                                    .map(([key]) => key)
-                                                    .join(', ') || 'none'}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )) : <p className="text-slate-500">No services found for this device.</p>}
-                    </div>
+        <div className="h-full flex flex-col">
+            <h3 className="text-xl font-semibold mb-2">Spell Compendium</h3>
+            <p className="text-slate-400 mb-4 text-sm">Explore all known spells. Click a spell to view its details and VFX macro, powered by Gemini. Spells you have personally cast are highlighted.</p>
+            <div className="flex gap-2 mb-4">
+                <input 
+                    type="text"
+                    value={filter}
+                    onChange={e => setFilter(e.target.value)}
+                    placeholder="Search all spells..."
+                    className="flex-grow w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
+                />
+                <button
+                    onClick={onUnlockAll}
+                    className="flex flex-shrink-0 items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg text-sm"
+                    title="Add all spells from the master list to your discovered spell book."
+                >
+                    <SparklesIcon />
+                    Unlock All
+                </button>
+            </div>
+            <div className="flex-grow overflow-y-auto pr-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {filteredSpells.map(spellName => {
+                        const isDiscovered = spellBook.some(s => s.name === spellName);
+                        return (
+                            <button
+                                key={spellName}
+                                onClick={() => onSelectSpell(spellName)}
+                                className={`p-2 rounded text-left text-sm transition-colors ${
+                                    isDiscovered 
+                                        ? 'bg-green-800/50 hover:bg-green-700/50 border border-green-700 text-green-300' 
+                                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                }`}
+                            >
+                                {spellName.replace(/_/g, ' ')}
+                            </button>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
         </div>
     );
 };
@@ -3056,18 +3387,68 @@ interface ModalProps {
     onClose: () => void;
     children: React.ReactNode;
 }
+const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
+        <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl border border-slate-700 m-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b border-slate-700">
+                <h2 className="text-lg font-semibold">{title}</h2>
+                <button onClick={onClose} className="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <div className="p-6 max-h-[80vh] overflow-y-auto">
+                {children}
+            </div>
+        </div>
+    </div>
+);
 
-const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
+
+interface BleExplorerProps {
+    onScan: () => void;
+    isExploring: boolean;
+    device: BluetoothDevice | null;
+    services: ExplorerService[];
+}
+const BleExplorer: React.FC<BleExplorerProps> = ({ onScan, isExploring, device, services }) => {
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
-            <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-lg border border-slate-700 m-4">
-                <div className="flex justify-between items-center p-4 border-b border-slate-700">
-                    <h2 className="text-xl font-bold text-indigo-400">{title}</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                <div>{children}</div>
+        <div className="h-full flex flex-col">
+            <h3 className="text-xl font-semibold mb-2">BLE Service Explorer</h3>
+            <p className="text-slate-400 mb-4 text-sm">Scan for any nearby BLE device and inspect its services and characteristics. This is a generic tool for exploring devices beyond the Magic Wand.</p>
+            <div className="flex-shrink-0 mb-4">
+                <button onClick={onScan} disabled={isExploring} className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500">
+                    {isExploring ? 'Scanning...' : 'Start Scan'}
+                </button>
+            </div>
+            <div className="flex-grow overflow-y-auto pr-2">
+                {device && (
+                    <div className="bg-slate-900/50 p-3 rounded-lg mb-4 border border-slate-700">
+                        <p className="font-semibold">Device: <span className="font-normal text-indigo-400">{device.name || 'N/A'}</span></p>
+                        <p className="font-semibold text-xs">ID: <span className="font-mono text-slate-400">{device.id}</span></p>
+                    </div>
+                )}
+                {services.length > 0 ? (
+                    <div className="space-y-3">
+                        {services.map(service => (
+                            <div key={service.uuid} className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                                <p className="font-semibold text-green-400">Service: {service.uuid}</p>
+                                <ul className="mt-2 pl-4 space-y-1">
+                                    {service.characteristics.map(char => (
+                                        <li key={char.uuid}>
+                                            <p className="text-cyan-400">Characteristic: {char.uuid}</p>
+                                            <p className="text-xs text-slate-400">
+                                                Properties: {Object.entries(char.properties)
+                                                    .filter(([, value]) => value)
+                                                    .map(([key]) => key)
+                                                    .join(', ') || 'none'}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-slate-500 text-center">{isExploring ? 'Waiting for connection...' : 'Scan a device to see its services.'}</p>
+                )}
             </div>
         </div>
     );

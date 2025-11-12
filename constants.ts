@@ -62,6 +62,7 @@ export const WBDLProtocol = {
   CMD: {
     STATUS_FIRMWARE_REQUEST: 0x00,
     STATUS_BATTERY_REQUEST: 0x01,
+    BOX_ADDRESS_REQUEST: 0x09, // New from smali: Request for paired box address
     PRODUCT_INFO_REQUEST: 0x0D, // GUESS: Request for SKU, serial, etc. based on existence of response
     IMU_STREAM_START: 0x30,
     IMU_STREAM_STOP: 0x31,
@@ -100,6 +101,7 @@ export const WBDLProtocol = {
   INCOMING_OPCODE: {
       GESTURE_EVENT: 0x25,      // GUESS
       BUTTON_STATE_UPDATE: 0x26, // GUESS
+      BOX_ADDRESS_RESPONSE: 0x0A, // GUESS: Response to BOX_ADDRESS_REQUEST
       PRODUCT_INFO_RESPONSE: 0x0E, // Confirmed from Box smali
       BUTTON_THRESHOLD_RESPONSE: 0xDE, // GUESS: Response to READ_BUTTON_THRESHOLD
   },
@@ -130,6 +132,7 @@ export const WBDLPayloads = {
     FIRMWARE_REQUEST_CMD: new Uint8Array([WBDLProtocol.CMD.STATUS_FIRMWARE_REQUEST]),
     BATTERY_REQUEST_CMD: new Uint8Array([WBDLProtocol.CMD.STATUS_BATTERY_REQUEST]),
     PRODUCT_INFO_REQUEST_CMD: new Uint8Array([WBDLProtocol.CMD.PRODUCT_INFO_REQUEST]),
+    BOX_ADDRESS_REQUEST_CMD: new Uint8Array([WBDLProtocol.CMD.BOX_ADDRESS_REQUEST]),
     MACRO_READY_TO_CAST_CMD: new Uint8Array([
         WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, 
         WBDLProtocol.PREDEFINED_MACRO_ID.READY_TO_CAST_NO_HAPTIC
