@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS } from './constants';
@@ -5,7 +7,11 @@ import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_T
 import { WandTypes, RawPacket, ConnectionState } from './types';
 import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
 import Scripter from './Scripter';
-import { GoogleGenAI, Type } from '@google/genai';
+import { WandBoxHelper } from './WandBoxHelper';
+// FIX: Cannot find name 'SPELL_REACTION_MACROS'.
+import { SPELL_REACTION_MACROS } from './spellMacroHelper';
+// FIX: Type 'unknown' is not assignable to type 'Key'. Expected 0 arguments, but got 1. By explicitly typing the response, we resolve the ambiguity.
+import { GoogleGenAI, Type, GenerateContentResponse } from '@google/genai';
 
 
 // --- HELPER FUNCTIONS ---
@@ -674,6 +680,7 @@ const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
+const LOCAL_STORAGE_KEY_LAST_WAND_STATE = 'magicWandLastWandState';
 
 
 // --- IMU Data Parsing ---
@@ -709,11 +716,15 @@ const parseImuPacket = (data: Uint8Array): IMUReading[] => {
 
         // Apply scaling and coordinate system flips based on o.smali analysis
         const accel_x = raw_ax * ACCEL_SCALE;
-        const accel_y = -raw_ay * ACCEL_SCALE;
+        // FIX: Wrapped the negated value in parentheses to ensure correct operator precedence and resolve parser ambiguity.
+        // FIX: Changed unary minus to subtraction to avoid potential TypeScript parser issues.
+        const accel_y = (0 - raw_ay) * ACCEL_SCALE;
         const accel_z = raw_az * ACCEL_SCALE;
 
         const gyro_x = raw_gx * GYRO_SCALE;
-        const gyro_y = -raw_gy * GYRO_SCALE;
+        // FIX: Wrapped the negated value in parentheses to ensure correct operator precedence.
+        // FIX: Changed unary minus to subtraction to avoid potential TypeScript parser issues.
+        const gyro_y = (0 - raw_gy) * GYRO_SCALE;
         const gyro_z = raw_gz * GYRO_SCALE;
 
         results.push({
@@ -750,8 +761,8 @@ interface SpellBookProps {
 
 const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, discoveredCount, totalCount, spellFilter, setSpellFilter, castingHistory }) => {
     const castCounts = React.useMemo(() => {
-        // FIX: Explicitly type the accumulator in `reduce` to prevent potential type inference issues.
-        return castingHistory.reduce<Record<string, number>>((acc, cast) => {
+        // FIX: Explicitly type the accumulator in the callback function to prevent potential type inference issues.
+        return castingHistory.reduce((acc: Record<string, number>, cast) => {
             acc[cast.name] = (acc[cast.name] ?? 0) + 1;
             return acc;
         }, {});
@@ -777,26 +788,53 @@ const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, disc
                     <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${discoveryPercentage}%` }}></div>
                 </div>
             </div>
-            <input
-                type="text"
-                value={spellFilter}
-                onChange={(e) => setSpellFilter(e.target.value)}
-                placeholder="Filter discovered spells..."
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <div className="flex-grow overflow-y-auto -mr-2 pr-2">
-                <ul className="space-y-2">
-                    {filteredAndSortedSpells.map(spell => (
-                        <li key={spell.name} className="flex justify-between items-center bg-slate-700/50 p-2 rounded-md animate-fade-in">
-                            <span className="text-slate-300">{spell.name.replace(/_/g, ' ')}</span>
-                            {castCounts[spell.name] > 0 && (
-                                <span className="text-xs bg-indigo-500/50 text-indigo-300 font-mono px-2 py-0.5 rounded-full">
-                                    x{castCounts[spell.name]}
-                                </span>
+
+            <div className="flex-grow grid grid-rows-2 gap-4 mt-2 overflow-hidden">
+                <div className="flex flex-col min-h-0">
+                    <input
+                        type="text"
+                        value={spellFilter}
+                        onChange={(e) => setSpellFilter(e.target.value)}
+                        placeholder="Filter discovered spells..."
+                        className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mb-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 flex-shrink-0"
+                    />
+                    <div className="flex-grow overflow-y-auto -mr-2 pr-2">
+                        {filteredAndSortedSpells.length > 0 ? (
+                            <ul className="space-y-2">
+                                {filteredAndSortedSpells.map(spell => (
+                                    <li key={spell.name} className="flex justify-between items-center bg-slate-700/50 p-2 rounded-md animate-fade-in">
+                                        <span className="text-slate-300">{spell.name.replace(/_/g, ' ')}</span>
+                                        {castCounts[spell.name] > 0 && (
+                                            <span className="text-xs bg-indigo-500/50 text-indigo-300 font-mono px-2 py-0.5 rounded-full">
+                                                x{castCounts[spell.name]}
+                                            </span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-slate-500 text-sm text-center pt-4">No discovered spells match filter.</p>
+                        )}
+                    </div>
+                </div>
+                
+                <div className="flex flex-col min-h-0">
+                    <h3 className="text-md font-semibold text-slate-400 mb-2 flex-shrink-0">Casting History</h3>
+                    <div className="flex-grow overflow-y-auto -mr-2 pr-2">
+                        <ul className="space-y-1">
+                            {castingHistory.length > 0 ? (
+                                castingHistory.map(cast => (
+                                    <li key={cast.id} className="flex justify-between items-center bg-slate-900/50 p-1.5 rounded-md text-sm animate-fade-in">
+                                        <span className="text-slate-300">{cast.name.replace(/_/g, ' ')}</span>
+                                        <span className="text-slate-500 font-mono text-xs">{cast.timestamp}</span>
+                                    </li>
+                                ))
+                            ) : (
+                                <p className="text-slate-500 text-sm text-center pt-4">Cast a spell to see history.</p>
                             )}
-                        </li>
-                    ))}
-                </ul>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -813,15 +851,16 @@ const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, castingHis
     const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name)), [spellBook]);
 
     const castCounts = React.useMemo(() => {
-        // FIX: Explicitly type the accumulator in `reduce` to prevent potential type inference issues.
-        return castingHistory.reduce<Record<string, number>>((acc, cast) => {
+        // FIX: Explicitly type the accumulator in the callback function to prevent potential type inference issues.
+        return castingHistory.reduce((acc: Record<string, number>, cast) => {
             acc[cast.name] = (acc[cast.name] ?? 0) + 1;
             return acc;
         }, {});
     }, [castingHistory]);
 
     // FIX: Memoize the sorted spell list to improve performance and avoid potential toolchain errors.
-    const sortedSpellList = React.useMemo(() => [...SPELL_LIST].sort(), []);
+    // FIX: Add explicit compare function to sort to fix type inference issues and ensure correct sorting.
+    const sortedSpellList = React.useMemo(() => [...SPELL_LIST].sort((a: string, b: string) => a.localeCompare(b)), []);
 
     return (
         <div className="h-full flex flex-col space-y-4">
@@ -1522,7 +1561,7 @@ export default function App() {
 
       const systemInstruction = `You are a magical archivist providing data about spells from a wizarding world. For a given spell name, you must return a single, valid JSON object with details about that spell, conforming to the provided schema. The 'spell_name' in the response should be the same as the input spell name, formatted in uppercase. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
 
-      const response = await ai.models.generateContent({
+      const response: GenerateContentResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Provide the details for the spell: "${spellName}".`,
         config: {
@@ -1555,6 +1594,21 @@ export default function App() {
       setIsFetchingSpellDetails(false);
     }
   }, [lastSpell, fetchSpellDetails]);
+
+  // Save last wand state effect for live spells
+  React.useEffect(() => {
+    if (spellDetails && lastSpell?.isLive) {
+        const firstMacroVariation = spellDetails.config_wand?.macros_payoff?.[0];
+        if (firstMacroVariation) {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY_LAST_WAND_STATE, JSON.stringify(firstMacroVariation));
+                addLog('INFO', `Saved last wand state for "${spellDetails.spell_name}".`);
+            } catch (e) {
+                addLog('ERROR', 'Failed to save last wand state.');
+            }
+        }
+    }
+  }, [spellDetails, lastSpell, addLog]);
 
 
   const clearKeepAlive = React.useCallback(() => {
@@ -1620,41 +1674,37 @@ export default function App() {
 
   }, [isHueEnabled, hueBridgeIp, hueUsername, hueLightId, addLog]);
 
-  const handleDisconnect = React.useCallback(() => {
-    if (!wandDetails) return;
-    addLog('INFO', `Wand disconnected: ${wandDetails.bleName}`);
+  const handleDisconnect = React.useCallback((device: BluetoothDevice) => {
+    addLog('INFO', `Device disconnected: ${device.name}`);
     addBleEvent('GATT', 'Disconnected');
-    setWandConnectionState(ConnectionState.DISCONNECTED);
-    setWandDetails(null);
-    setWandBatteryLevel(null);
-    clearKeepAlive();
-    commandCharacteristic.current = null;
-    setIsImuStreaming(false);
-    setLatestImuData(null);
-    setGestureState('Idle');
-    setButtonState([false, false, false, false]);
-    setRawWandProductInfo(null);
-    setNegotiatedMtu(WBDLPayloads.MTU_PAYLOAD_SIZE); // Reset MTU on disconnect
-    setClientSideGestureDetected(false); // Reset gesture detector
-    // Clear any pending commands on disconnect
-    setWriteQueue([]);
-    isWriting.current = false;
-    setLiveEvent(null);
-    if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
-  }, [addLog, clearKeepAlive, wandDetails, addBleEvent]);
-  
-  const handleBoxDisconnect = React.useCallback(() => {
-    if (!boxDetails) return;
-    addLog('INFO', `Wand Box disconnected: ${boxDetails.bleName}`);
-    addBleEvent('GATT', 'Box Disconnected');
-    setBoxConnectionState(ConnectionState.DISCONNECTED);
-    setBoxDetails(null);
-    setBoxBatteryLevel(null);
-    setRawBoxProductInfo(null);
-    boxCommandCharacteristic.current = null;
-    setBoxWriteQueue([]);
-    isBoxWriting.current = false;
-  }, [addLog, boxDetails, addBleEvent]);
+
+    if (wandDetails?.device === device) {
+      setWandConnectionState(ConnectionState.DISCONNECTED);
+      setWandDetails(null);
+      setWandBatteryLevel(null);
+      clearKeepAlive();
+      commandCharacteristic.current = null;
+      setIsImuStreaming(false);
+      setLatestImuData(null);
+      setGestureState('Idle');
+      setButtonState([false, false, false, false]);
+      setRawWandProductInfo(null);
+      setNegotiatedMtu(WBDLPayloads.MTU_PAYLOAD_SIZE);
+      setClientSideGestureDetected(false);
+      setWriteQueue([]);
+      isWriting.current = false;
+      setLiveEvent(null);
+      if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+    } else if (boxDetails?.device === device) {
+      setBoxConnectionState(ConnectionState.DISCONNECTED);
+      setBoxDetails(null);
+      setBoxBatteryLevel(null);
+      setRawBoxProductInfo(null);
+      boxCommandCharacteristic.current = null;
+      setBoxWriteQueue([]);
+      isBoxWriting.current = false;
+    }
+  }, [addLog, clearKeepAlive, wandDetails, boxDetails, addBleEvent]);
 
   const queueCommand = React.useCallback((payload: Uint8Array, silent: boolean = false) => {
     setWriteQueue(prev => [...prev, { payload, silent }]);
@@ -1850,6 +1900,66 @@ export default function App() {
           addLog('ERROR', `Failed to parse Product Info packet for ${forDevice} (type 0x${infoType.toString(16)}): ${String(e)}`);
       }
   }, [addLog]);
+  
+  const sendMacroSequence = React.useCallback((commands: MacroCommand[], target: 'wand' | 'box' = 'wand') => {
+    if (target === 'wand' && wandConnectionState !== ConnectionState.CONNECTED) {
+      addLog('ERROR', 'Cannot send macro: Wand not connected.');
+      return;
+    }
+    if (target === 'box' && boxConnectionState !== ConnectionState.CONNECTED) {
+      addLog('ERROR', 'Cannot send macro: Box not connected.');
+      return;
+    }
+  
+    const queue = target === 'wand' ? queueCommand : queueBoxCommand;
+    
+    // Always flush any existing macro first
+    queue(WBDLPayloads.MACRO_FLUSH_CMD);
+    
+    addLog('INFO', `Building and sending macro to ${target}...`);
+    let payload: number[] = [];
+  
+    for (const cmd of commands) {
+      let instructionBytes: number[] = [];
+      switch (cmd.command) {
+        case 'LightTransition':
+          const color = (cmd.color || '#000000').substring(1); // remove #
+          const r = parseInt(color.substring(0, 2), 16);
+          const g = parseInt(color.substring(2, 4), 16);
+          const b = parseInt(color.substring(4, 6), 16);
+          const duration = cmd.duration || 1000;
+          const group = cmd.group || 0;
+          instructionBytes = [WBDLProtocol.INST.MACRO_LIGHT_TRANSITION, group, r, g, b, duration & 0xFF, (duration >> 8) & 0xFF];
+          break;
+        case 'HapticBuzz': {
+          const duration = cmd.duration || 500;
+          const vibIntensity = 0x58; // Standard intensity from smali
+          // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+          instructionBytes = [WBDLProtocol.CMD.HAPTIC_VIBRATE, vibIntensity, Math.round(duration / 255)];
+          break;
+        }
+        case 'MacroDelay': {
+          const duration = cmd.duration || 500;
+          instructionBytes = [WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF];
+          break;
+        }
+        case 'LightClear':
+          instructionBytes = [WBDLProtocol.INST.MACRO_LIGHT_CLEAR, 0x00];
+          break;
+      }
+  
+      if (instructionBytes.length > 0) {
+        payload.push(...instructionBytes);
+      }
+    }
+  
+    if (payload.length > 0) {
+      queue(new Uint8Array(payload));
+      queue(new Uint8Array([WBDLProtocol.CMD.MACRO_EXECUTE]));
+    }
+  }, [addLog, wandConnectionState, boxConnectionState, queueCommand, queueBoxCommand]);
+
+  const wandBoxHelper = React.useMemo(() => new WandBoxHelper(sendMacroSequence), [sendMacroSequence]);
 
   const parseStreamData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
@@ -1932,129 +2042,56 @@ export default function App() {
       }
 
       if (data[0] === 0x24) { // Spell packet candidate
-        const header = data.slice(0, 4);
-        const headerHex = bytesToHex(header);
-
-        // Basic validation: packet must be long enough for a header.
-        if (data.length < 4) {
-          addLog('WARNING', `Runt spell packet received: ${hexData}`);
-          setGestureState('Idle');
-          return;
+        if (data.length < 5) {
+            addLog('WARNING', `Runt spell packet received: ${hexData}`);
+            setGestureState('Idle');
+            if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+            setLiveEvent(null);
+            return;
         }
+        
+        const spellId = data[4];
+        const spellName = SPELL_LIST[spellId];
 
-        const spellLength = data[3];
-        const remainingDataLength = data.length - 4;
+        if (spellName) {
+            addLog('SUCCESS', `Spell Cast Detected: ${spellName} (ID: 0x${spellId.toString(16)})`);
+            setLastSpell({ name: spellName, isLive: true });
 
-        // Sanity check 1: The declared length must not exceed the remaining packet data.
-        if (spellLength > remainingDataLength) {
-          addLog('WARNING', `Corrupt spell packet: Declared length (${spellLength}) is greater than available data (${remainingDataLength}). Header: ${headerHex}, Full packet: ${hexData}`);
-          setGestureState('Idle');
-          return;
-        }
-
-        // It's possible for a spell packet to be sent with no spell name yet.
-        if (spellLength === 0) {
-          addLog('INFO', `Ignoring spell packet with zero length (likely pre-spell data). Header: ${headerHex}`);
-          setGestureState('Idle');
-          return;
-        }
-
-        try {
-          const spellNameBytes = data.slice(4, 4 + spellLength);
-          const rawSpellName = textDecoder.decode(spellNameBytes);
-          
-          if (!/^[ -~]+$/.test(rawSpellName)) {
-              addLog('WARNING', `Spell name contains non-printable characters. Raw: "${rawSpellName}", Header: ${headerHex}`);
-              setGestureState('Idle');
-              return;
-          }
-
-          const cleanedSpellName = rawSpellName.trim();
-          
-          if (!/[a-zA-Z]/.test(cleanedSpellName)) {
-              addLog('INFO', `Ignoring empty or symbolic-only spell name. Raw: "${rawSpellName}", Header: ${headerHex}`);
-              setGestureState('Idle');
-              return;
-          }
-
-          // New: Normalize incoming spell names based on smali analysis to match canonical list.
-          const normalizeIncomingSpell = (name: string): string => {
-              const lower = name.toLowerCase();
-              // Specific overrides from smali analysis
-              if (lower === 'the_hair_growing_charm') return "The_Hair_Thickening_Growing_Charm";
-              if (lower === 'wingardium leviosa') return "Wingardium_Leviosa";
-              if (lower === 'petrificustotalus') return "Petrificus_Totalus";
-              if (lower === 'expectopatronum') return "Expecto_Patronum";
-              
-              // Generic fallback to find canonical name from master list, ignoring case and separators
-              const normalizedLower = lower.replace(/[\s_]+/g, '');
-              const match = SPELL_LIST.find(canonical => canonical.toLowerCase().replace(/_/g, '') === normalizedLower);
-              // Fallback to uppercasing if it's a totally new/unknown spell not in our list
-              return match || name.toUpperCase();
-          };
-
-          const finalSpellName = normalizeIncomingSpell(cleanedSpellName);
-
-          // New: Live Event for spell decoding and payoff trigger
-          if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
-          setLiveEvent({ message: `Spell Decoded! Triggering payoffs.`, type: 'success' });
-          liveEventTimeout.current = window.setTimeout(() => setLiveEvent(null), 4000); // Clear after 4s
-
-          addLog('SUCCESS', `SPELL DETECTED: *** ${finalSpellName} *** (Raw: "${cleanedSpellName}", Header: ${headerHex})`);
-          
-          setLastSpell({ name: finalSpellName, isLive: true });
-          setGestureState('Idle');
-          
-          sendTvBroadcast(finalSpellName);
-          handleHueSpell(finalSpellName);
-
-          // Add to spell book if it's a new spell, using the canonical name
-          setSpellBook(prevBook => {
-            const exists = prevBook.some(spell => spell.name.toUpperCase() === finalSpellName.toUpperCase());
-            if (!exists) {
-              addLog('INFO', `New spell "${finalSpellName}" added to Spell Book!`);
-              return [...prevBook, { name: finalSpellName, firstSeen: new Date().toISOString() }];
+            if (!discoveredSpells.has(spellName.toUpperCase())) {
+                const newSpell: Spell = { name: spellName, firstSeen: new Date().toISOString() };
+                setSpellBook(prev => [...prev, newSpell].sort((a, b) => a.name.localeCompare(b.name)));
+                addLog('INFO', `New spell discovered: ${spellName}! Added to spell book.`);
             }
-            return prevBook;
-          });
 
-          // Add to casting history
-          const newHistoryEntry: CastingHistoryEntry = {
-            id: castingHistoryCounter.current++,
-            name: finalSpellName,
-            timestamp: getTimestamp(),
-          };
-          setCastingHistory(prev => [newHistoryEntry, ...prev].slice(0, 100)); // Prepend and cap at 100
-
-
-        } catch (e) {
-          addLog('ERROR', `Error decoding spell packet. Header: ${headerHex}, Packet: ${hexData}, Error: ${String(e)}`);
-          setGestureState('Idle');
-        }
-      } else {
-         addLog('INFO', `Wand CH2 Unknown Packet: ${hexData}`);
-         if (data.length > 0) {
-            const potentialOpCode = data[0];
-            setDetectedOpCodes(prev => {
-                if (prev.has(potentialOpCode)) return prev;
-                const newSet = new Set(prev);
-                newSet.add(potentialOpCode);
-                return newSet;
+            setCastingHistory(prev => {
+                const newEntry = { id: castingHistoryCounter.current++, name: spellName, timestamp: getTimestamp() };
+                const newHistory = [newEntry, ...prev];
+                return newHistory.slice(0, 100);
             });
-            setRawPacketLog(prev => {
-              const newEntry = { id: rawPacketLogCounter.current++, timestamp: getTimestamp(), hexData };
-              const newLog = [newEntry, ...prev];
-              // Keep the log from growing indefinitely
-              if (newLog.length > 100) {
-                  return newLog.slice(0, 100);
-              }
-              return newLog;
-          });
-         }
+            
+            sendTvBroadcast(spellName);
+            handleHueSpell(spellName);
+            
+            if (boxConnectionState === ConnectionState.CONNECTED) {
+                wandBoxHelper.reactToSpell(spellName);
+            }
+
+        } else {
+            addLog('WARNING', `Unknown spell ID received: 0x${spellId.toString(16)}`);
+            setLastSpell({ name: `Unknown (0x${spellId.toString(16)})`, isLive: true });
+        }
+        
+        setGestureState('Idle');
+        if (liveEventTimeout.current) clearTimeout(liveEventTimeout.current);
+        setLiveEvent({ message: `Spell Cast: ${spellName || 'Unknown'}!`, type: 'success' });
+        liveEventTimeout.current = window.setTimeout(() => setLiveEvent(null), 3000);
+        return;
       }
+      
+      addLog('WARNING', `Unhandled Wand CH2 packet: ${hexData}`);
     }
-  }, [addLog, isImuStreaming, queueCommand, sendTvBroadcast, handleHueSpell, addBleEvent, isClientSideGestureDetectionEnabled, gestureState, clientSideGestureDetected, gestureThreshold]);
-  
+  }, [addLog, addBleEvent, isImuStreaming, isClientSideGestureDetectionEnabled, gestureState, gestureThreshold, discoveredSpells, sendTvBroadcast, handleHueSpell, boxConnectionState, wandBoxHelper, queueCommand]);
+
   const parseControlData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Control: ${target.uuid.substring(4, 8)})`);
@@ -2064,921 +2101,263 @@ export default function App() {
     const data = new Uint8Array(value.buffer);
     const hexData = bytesToHex(data);
     addLog('DATA_IN', `Wand CH1 Received: ${hexData}`);
-
-    if (data.length > 0 && data[0] === WBDLProtocol.INCOMING_OPCODE.PRODUCT_INFO_RESPONSE) {
-      setRawWandProductInfo(prev => `${prev ? prev + '\n' : ''}${getTimestamp()}: ${hexData}`);
-      handleProductInfoPacket(data, 'wand');
-      return;
-    }
-
-    // New: Handle box address response based on smali analysis
-    if (data.length === 7 && data[0] === WBDLProtocol.INCOMING_OPCODE.BOX_ADDRESS_RESPONSE) {
-        const addressBytes = data.slice(1); // Get the 6 address bytes
-        const macAddress = Array.from(addressBytes)
-            .reverse() // Smali shows address is reversed in payload
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join(':')
-            .toUpperCase();
+    setRawPacketLog(prev => [{id: rawPacketLogCounter.current++, timestamp: getTimestamp(), hexData}, ...prev].slice(0, 50));
+    
+    if (data.length > 0) {
+        setDetectedOpCodes(prev => new Set(prev).add(data[0]));
         
-        setWandDetails(prev => prev ? { ...prev, companionAddress: macAddress } : prev);
-        addLog('SUCCESS', `Received Companion Box Address: ${macAddress}`);
-        return;
-    }
-    
-    // New: Handle button threshold response
-    if (data.length === 4 && data[0] === WBDLProtocol.INCOMING_OPCODE.BUTTON_THRESHOLD_RESPONSE) {
-        const buttonIndex = data[1];
-        const minValue = data[2];
-        const maxValue = data[3];
-        if (buttonIndex >= 0 && buttonIndex < 4) {
-            setButtonThresholds(prev => {
-                const newThresholds = [...prev];
-                newThresholds[buttonIndex] = { min: minValue, max: maxValue };
-                return newThresholds;
-            });
-            addLog('SUCCESS', `Received threshold for button ${buttonIndex + 1}: Min=${minValue}, Max=${maxValue}`);
-        } else {
-            addLog('WARNING', `Received threshold response with invalid button index: ${buttonIndex}`);
+        switch (data[0]) {
+            case WBDLProtocol.CMD.STATUS_FIRMWARE_REQUEST:
+                if (data.length >= 21) {
+                    const firmware = textDecoder.decode(data.slice(1, 21)).trim().replace(/\0/g, '');
+                    setWandDetails(prev => prev ? { ...prev, firmware } : prev);
+                    addLog('SUCCESS', `Received Firmware: ${firmware}`);
+                }
+                break;
+            case WBDLProtocol.CMD.STATUS_BATTERY_REQUEST:
+                if (data.length >= 2) {
+                    setWandBatteryLevel(data[1]);
+                }
+                break;
+            case WBDLProtocol.INCOMING_OPCODE.PRODUCT_INFO_RESPONSE:
+                 setRawWandProductInfo(prev => prev ? `${prev}\n${hexData}` : hexData);
+                 handleProductInfoPacket(data, 'wand');
+                 break;
+            case WBDLProtocol.INCOMING_OPCODE.BOX_ADDRESS_RESPONSE:
+                if (data.length >= 7) {
+                    const address = Array.from(data.slice(1, 7)).reverse().map(b => b.toString(16).padStart(2, '0')).join(':').toUpperCase();
+                    setWandDetails(prev => prev ? {...prev, companionAddress: address } : prev);
+                    addLog('SUCCESS', `Received Box Address: ${address}`);
+                }
+                break;
+            case WBDLProtocol.INCOMING_OPCODE.BUTTON_THRESHOLD_RESPONSE:
+                if (data.length >= 9) {
+                    const view = new DataView(data.buffer);
+                    const newThresholds: ButtonThresholds[] = [
+                        { min: view.getUint16(1, true), max: view.getUint16(3, true) },
+                        { min: view.getUint16(5, true), max: view.getUint16(7, true) },
+                        { min: null, max: null }, 
+                        { min: null, max: null } 
+                    ];
+                    setButtonThresholds(prev => [newThresholds[0], newThresholds[1], prev[2], prev[3]]);
+                    addLog('SUCCESS', `Read button thresholds. B1: ${newThresholds[0].min}-${newThresholds[0].max}, B2: ${newThresholds[1].min}-${newThresholds[1].max}`);
+                }
+                break;
+            default:
+                addLog('INFO', `Unhandled Wand CH1 Opcode: 0x${data[0].toString(16)}`);
+                break;
         }
-        return;
     }
-
-    // Attempt to decode as firmware string
-    try {
-        const text = textDecoder.decode(data);
-        // Basic check if it's a plausible firmware string
-        if (text.includes("MCW") && text.length > 3) {
-            setWandDetails(prev => prev ? { ...prev, firmware: text.trim() } : prev);
-            addLog('SUCCESS', `Wand Firmware version received: ${text.trim()}`);
-            return;
-        }
-    } catch (e) { /* Not a valid string, continue */ }
-    
-    // Fallback for other packet types on this channel
-    if (data.length > 0) {
-        const potentialOpCode = data[0];
-        setDetectedOpCodes(prev => {
-            if (prev.has(potentialOpCode)) return prev;
-            const newSet = new Set(prev);
-            newSet.add(potentialOpCode);
-            return newSet;
-        });
-        setRawPacketLog(prev => {
-          const newEntry = { id: rawPacketLogCounter.current++, timestamp: getTimestamp(), hexData };
-          const newLog = [newEntry, ...prev];
-          if (newLog.length > 100) return newLog.slice(0, 100);
-          return newLog;
-        });
-    }
-
   }, [addLog, addBleEvent, handleProductInfoPacket]);
   
-  const parseBoxData = React.useCallback((event: Event) => {
-    const target = event.target as BluetoothRemoteGATTCharacteristic;
-    addBleEvent('Event', `characteristicvaluechanged (Box: ${target.uuid.substring(4, 8)})`);
-    const value = target.value;
-    if (!value) return;
-
-    const data = new Uint8Array(value.buffer);
-    const hexData = bytesToHex(data);
-    addLog('DATA_IN', `Wand Box Received: ${hexData}`);
-    
-    if (data.length > 0) {
-        const opCode = data[0];
-        // Based on WandBoxHelper.smali decode() method
-        if (opCode === 0x00) { // Firmware response
-            try {
-                const text = textDecoder.decode(data.slice(1)); // Assuming first byte is opcode
-                const cleanedText = text.replace(/[\x00-\x1F\x7F-\x9F]/g, "").trim();
-                setBoxDetails(prev => prev ? { ...prev, firmware: cleanedText } : prev);
-                addLog('SUCCESS', `Wand Box Firmware detected: ${cleanedText}`);
-            } catch(e) {
-                 addLog('WARNING', `Could not decode Box Firmware string from packet: ${hexData}`);
-            }
-        } else if (opCode === WBDLProtocol.INCOMING_OPCODE.PRODUCT_INFO_RESPONSE) { // Product Info response
-             setRawBoxProductInfo(prev => `${prev ? prev + '\n' : ''}${getTimestamp()}: ${hexData}`);
-             handleProductInfoPacket(data, 'box');
-        }
-
-        const potentialOpCode = data[0];
-        setDetectedOpCodes(prev => {
-            if (prev.has(potentialOpCode)) return prev;
-            const newSet = new Set(prev);
-            newSet.add(potentialOpCode);
-            return newSet;
-        });
-        setRawPacketLog(prev => {
-          const newEntry = { id: rawPacketLogCounter.current++, timestamp: getTimestamp(), hexData };
-          const newLog = [newEntry, ...prev];
-          if (newLog.length > 100) return newLog.slice(0, 100);
-          return newLog;
-        });
-    }
+  const parseBoxNotifyData = React.useCallback((event: Event) => {
+      const target = event.target as BluetoothRemoteGATTCharacteristic;
+      addBleEvent('Event', `characteristicvaluechanged (Box Notify: ${target.uuid.substring(4, 8)})`);
+      const value = target.value;
+      if (!value) return;
+      
+      const data = new Uint8Array(value.buffer);
+      const hexData = bytesToHex(data);
+      addLog('DATA_IN', `Box Received: ${hexData}`);
+      setRawPacketLog(prev => [{id: rawPacketLogCounter.current++, timestamp: getTimestamp(), hexData}, ...prev].slice(0, 50));
+      
+      if (data.length > 0) {
+          setDetectedOpCodes(prev => new Set(prev).add(data[0]));
+          
+          switch (data[0]) {
+              case WBDLProtocol.INCOMING_OPCODE.PRODUCT_INFO_RESPONSE:
+                   setRawBoxProductInfo(prev => prev ? `${prev}\n${hexData}` : hexData);
+                   handleProductInfoPacket(data, 'box');
+                   break;
+              case WBDLProtocol.CMD.STATUS_BATTERY_REQUEST:
+                  if (data.length >= 2) {
+                      setBoxBatteryLevel(data[1]);
+                  }
+                  break;
+              default:
+                  addLog('INFO', `Unhandled Box Opcode: 0x${data[0].toString(16)}`);
+                  break;
+          }
+      }
   }, [addLog, addBleEvent, handleProductInfoPacket]);
 
+  const onCastOnWand = React.useCallback((details: SpellDetails | null) => {
+    if (!details || !details.config_wand?.macros_payoff) return;
+    
+    addLog('INFO', `Casting "${details.spell_name}" effect on Wand from details card.`);
+    
+    const macroVariations = details.config_wand.macros_payoff;
+    if (!macroVariations || macroVariations.length === 0) return;
+    
+    const currentIndex = macroIndexes.current[details.spell_name] ?? -1;
+    const nextIndex = (currentIndex + 1) % macroVariations.length;
+    macroIndexes.current[details.spell_name] = nextIndex;
+    
+    const macroToExecute = macroVariations[nextIndex];
+    sendMacroSequence(macroToExecute, 'wand');
 
-  const handleBatteryLevel = React.useCallback((event: Event) => {
-    const target = event.target as BluetoothRemoteGATTCharacteristic;
-    addBleEvent('Event', `characteristicvaluechanged (Battery: ${target.uuid.substring(4, 8)})`);
-    const value = target.value;
-    if (!value) return;
-    const level = value.getUint8(0);
-    setWandBatteryLevel(level);
-    addLog('INFO', `Wand Battery Level: ${level}%`);
-  }, [addLog, addBleEvent]);
-  
-  const handleBoxBatteryLevel = React.useCallback((event: Event) => {
-    const target = event.target as BluetoothRemoteGATTCharacteristic;
-     addBleEvent('Event', `characteristicvaluechanged (Box Battery: ${target.uuid.substring(4, 8)})`);
-    const value = target.value;
-    if (!value) return;
-    const level = value.getUint8(0);
-    setBoxBatteryLevel(level);
-    addLog('INFO', `Wand Box Battery Level: ${level}%`);
-  }, [addLog, addBleEvent]);
-
-  const createInitialDevice = (bleDevice: BluetoothDevice, type: WandDeviceType): WandDevice => ({
-    device: bleDevice,
-    deviceType: type,
-    address: bleDevice.id.toUpperCase(), // Standardize to uppercase for comparisons
-    bleName: bleDevice.name ?? 'Unknown',
-    wandType: 'UNKNOWN',
-    companionAddress: null,
-    version: null,
-    firmware: null,
-    serialNumber: null,
-    editionNumber: null,
-    sku: null,
-    mfgId: null,
-    deviceID: null,
-    edition: null,
-    deco: null,
-  });
-
-
-  const connectToWand = React.useCallback(async () => {
-    if (!navigator.bluetooth) {
-      addLog('ERROR', 'Web Bluetooth API is not available on this browser.');
-      addBleEvent('Error', 'Web Bluetooth not available');
-      setWandConnectionState(ConnectionState.ERROR);
-      return;
-    }
-    setWandConnectionState(ConnectionState.CONNECTING);
-    addLog('INFO', 'Requesting Wand (MCW) device from browser...');
-    addBleEvent('BLE', 'requestDevice (Wand)');
     try {
-      const bleDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: WBDLProtocol.TARGET_NAME }],
-        optionalServices: [WBDLProtocol.SERVICE_UUID_WAND_CONTROL, WBDLProtocol.SERVICE_UUID_BATTERY]
+        localStorage.setItem(LOCAL_STORAGE_KEY_LAST_WAND_STATE, JSON.stringify(macroToExecute));
+        addLog('INFO', `Saved last wand state for "${details.spell_name}" from manual cast.`);
+    } catch (e) {
+        addLog('ERROR', 'Failed to save last wand state.');
+    }
+
+  }, [addLog, sendMacroSequence]);
+
+  const onCastOnBox = React.useCallback((details: SpellDetails | null) => {
+    if (!details) return;
+    addLog('INFO', `Casting "${details.spell_name}" effect on Wand Box from details card.`);
+    wandBoxHelper.reactToSpell(details.spell_name);
+  }, [addLog, wandBoxHelper]);
+
+  const connectToDevice = React.useCallback(async (type: 'wand' | 'box') => {
+    const isWand = type === 'wand';
+    const protocol = isWand ? WBDLProtocol : WBDLProtocol.WAND_BOX;
+    const setState = isWand ? setWandConnectionState : setBoxConnectionState;
+    const setDetails = isWand ? setWandDetails : setBoxDetails;
+    const logPrefix = isWand ? "Wand" : "Box";
+
+    setState(ConnectionState.CONNECTING);
+    addLog('INFO', `Requesting ${logPrefix} device...`);
+
+    try {
+      addBleEvent('RequestDevice', `namePrefix: ${protocol.TARGET_NAME}`);
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: protocol.TARGET_NAME }],
+        optionalServices: [
+          isWand ? WBDLProtocol.SERVICE_UUID_WAND_CONTROL : WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN,
+          WBDLProtocol.SERVICE_UUID_BATTERY
+        ],
       });
 
-      addLog('INFO', `Found wand: ${bleDevice.name}. Connecting to GATT server...`);
-      addBleEvent('GATT', 'Connecting...');
-      setWandDetails(createInitialDevice(bleDevice, 'WAND'));
+      addLog('SUCCESS', `Found ${logPrefix}: ${device.name}`);
+      addBleEvent('DeviceFound', `${device.name} (${device.id})`);
+      device.addEventListener('gattserverdisconnected', () => handleDisconnect(device));
 
-      bleDevice.addEventListener('gattserverdisconnected', () => handleDisconnect());
-
-      const server = await bleDevice.gatt?.connect();
-      if (!server) throw new Error("GATT Server not found");
-
-      addLog('INFO', 'Connected to Wand GATT Server. Discovering services...');
+      addLog('INFO', 'Connecting to GATT server...');
+      const server = await device.gatt!.connect();
+      addLog('SUCCESS', 'GATT Server connected.');
       addBleEvent('GATT', 'Connected');
 
-      // New: MTU Negotiation inspired by smali analysis
-      if (server.device.gatt?.mtu) {
-          const newMtu = server.device.gatt.mtu - 3; // 3 bytes for ATT header
-          setNegotiatedMtu(newMtu);
-          addLog('SUCCESS', `Negotiated MTU size: ${newMtu} bytes (from browser-reported ${server.device.gatt.mtu}).`);
-          addBleEvent('GATT', `MTU set to ${newMtu}`);
-      } else {
-          addLog('WARNING', `Could not read MTU size from browser. Using default of ${WBDLPayloads.MTU_PAYLOAD_SIZE} bytes.`);
-          addBleEvent('GATT', `MTU default ${WBDLPayloads.MTU_PAYLOAD_SIZE}`);
+      if (server.mtu) {
+        setNegotiatedMtu(server.mtu);
+        addLog('INFO', `Negotiated MTU size: ${server.mtu} bytes.`);
       }
 
-      const service = await server.getPrimaryService(WBDLProtocol.SERVICE_UUID_WAND_CONTROL);
-      addLog('SUCCESS', `Found primary service: ${WBDLProtocol.SERVICE_UUID_WAND_CONTROL}`);
-      addBleEvent('Service', 'Control service found');
-      const batteryService = await server.getPrimaryService(WBDLProtocol.SERVICE_UUID_BATTERY);
-      addLog('SUCCESS', `Found battery service: ${WBDLProtocol.SERVICE_UUID_BATTERY}`);
-      addBleEvent('Service', 'Battery service found');
+      setDetails({
+          device: device,
+          deviceType: isWand ? 'WAND' : 'BOX',
+          bleName: device.name || 'Unknown',
+          address: device.id,
+          wandType: 'UNKNOWN',
+          companionAddress: null,
+          version: null,
+          firmware: null,
+          serialNumber: null,
+          editionNumber: null,
+          sku: null,
+          mfgId: null,
+          deviceID: null,
+          edition: null,
+          deco: null
+      });
+
+      const service = await server.getPrimaryService(isWand ? WBDLProtocol.SERVICE_UUID_WAND_CONTROL : WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN);
+      addLog('SUCCESS', `Got primary service for ${logPrefix}.`);
+      addBleEvent('Service', `Got primary: ${service.uuid.substring(4, 8)}`);
+
+      if (isWand) {
+        commandCharacteristic.current = await service.getCharacteristic(WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1);
+        const streamCharacteristic = await service.getCharacteristic(WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_2);
+        
+        await commandCharacteristic.current.startNotifications();
+        commandCharacteristic.current.addEventListener('characteristicvaluechanged', parseControlData);
+        
+        await streamCharacteristic.startNotifications();
+        streamCharacteristic.addEventListener('characteristicvaluechanged', parseStreamData);
+        
+        addLog('SUCCESS', 'Wand characteristics ready and notifications started.');
+        addBleEvent('Notify', 'Wand listeners attached');
+        
+        // Start keep-alive and fetch initial data
+        queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
+        queueCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
+        
+        keepAliveInterval.current = window.setInterval(() => {
+          queueCommand(WBDLPayloads.KEEPALIVE_COMMAND, true);
+        }, 5000);
+
+        // Restore last state
+        try {
+          const savedStateJSON = localStorage.getItem(LOCAL_STORAGE_KEY_LAST_WAND_STATE);
+          if (savedStateJSON) {
+              const savedMacro: MacroCommand[] = JSON.parse(savedStateJSON);
+              if (Array.isArray(savedMacro)) {
+                  addLog('INFO', 'Restoring last known wand state.');
+                  setTimeout(() => sendMacroSequence(savedMacro, 'wand'), 500);
+              }
+          }
+        } catch(e) {
+            addLog('ERROR', 'Failed to restore last wand state.');
+        }
+
+      } else { // Box
+        boxCommandCharacteristic.current = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_COMM);
+        const notifyCharacteristic = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_NOTIFY);
+        
+        await notifyCharacteristic.startNotifications();
+        notifyCharacteristic.addEventListener('characteristicvaluechanged', parseBoxNotifyData);
+
+        addLog('SUCCESS', 'Box characteristics ready.');
+        addBleEvent('Notify', 'Box listener attached');
+        queueBoxCommand(WBDLPayloads.BATTERY_REQUEST_CMD);
+        queueBoxCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
+      }
       
-      const commandChar = await service.getCharacteristic(WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1);
-      commandCharacteristic.current = commandChar;
-      const streamChar = await service.getCharacteristic(WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_2);
-      const batteryChar = await batteryService.getCharacteristic(WBDLProtocol.CHAR_UUID_BATTERY_LEVEL_NOTIFY);
-
-      addLog('INFO', 'Setting up characteristic notifications...');
-      addBleEvent('Characteristic', 'Starting notifications...');
-
-      if (commandChar.properties.notify) {
-        await commandChar.startNotifications();
-        commandChar.addEventListener('characteristicvaluechanged', parseControlData);
-        addLog('SUCCESS', 'Notifications enabled for Command channel.');
-      } else {
-        addLog('WARNING', 'Command characteristic does not support notifications.');
-      }
-      
-      if (streamChar.properties.notify) {
-        await streamChar.startNotifications();
-        streamChar.addEventListener('characteristicvaluechanged', parseStreamData);
-        addLog('SUCCESS', 'Notifications enabled for Stream channel.');
-      } else {
-        addLog('WARNING', 'Stream characteristic does not support notifications.');
-      }
-
-      if (batteryChar.properties.notify) {
-        await batteryChar.startNotifications();
-        batteryChar.addEventListener('characteristicvaluechanged', handleBatteryLevel);
-        addLog('SUCCESS', 'Notifications enabled for Battery level.');
-      } else {
-        addLog('WARNING', 'Battery characteristic does not support notifications.');
-      }
-      addBleEvent('Characteristic', 'Notifications started');
-
-      setWandConnectionState(ConnectionState.CONNECTED);
-      addLog('SUCCESS', 'Wand connection fully established!');
-
-      // Post-connection setup
-      queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
-      queueCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
-      
-      if (batteryChar.properties.read) {
-        const initialBatteryLevel = await batteryChar.readValue();
-        const level = initialBatteryLevel.getUint8(0);
-        setWandBatteryLevel(level);
-        addLog('INFO', `Initial Wand Battery Level: ${level}%`);
-      } else {
-        addLog('INFO', 'Cannot read initial battery level (property not supported). Waiting for notification.');
-      }
-
-      keepAliveInterval.current = window.setInterval(() => {
-        queueCommand(WBDLPayloads.KEEPALIVE_COMMAND, true);
-      }, 5000);
-
+      setState(ConnectionState.CONNECTED);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       addLog('ERROR', `Connection failed: ${errorMessage}`);
-      addBleEvent('Error', `Connection failed: ${errorMessage}`);
-      setWandConnectionState(ConnectionState.ERROR);
-      setWandDetails(null);
+      addBleEvent('Error', errorMessage);
+      setState(ConnectionState.ERROR);
     }
-  }, [addLog, handleDisconnect, parseControlData, parseStreamData, handleBatteryLevel, queueCommand, addBleEvent]);
+  }, [addLog, addBleEvent, handleDisconnect, parseControlData, parseStreamData, parseBoxNotifyData, queueCommand, queueBoxCommand, sendMacroSequence]);
 
-  const connectToBox = React.useCallback(async () => {
-    if (!navigator.bluetooth) {
-      addLog('ERROR', 'Web Bluetooth API is not available on this browser.');
-      addBleEvent('Error', 'Web Bluetooth not available');
-      setBoxConnectionState(ConnectionState.ERROR);
-      return;
-    }
-    setBoxConnectionState(ConnectionState.CONNECTING);
-    addLog('INFO', 'Requesting Wand Box (MCB) device from browser...');
-    addBleEvent('BLE', 'requestDevice (Box)');
-    try {
-      const bleDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: WBDLProtocol.WAND_BOX.TARGET_NAME }],
-        optionalServices: [WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN, WBDLProtocol.WAND_BOX.SERVICE_UUID_BATTERY]
-      });
-
-      addLog('INFO', `Found Wand Box: ${bleDevice.name}. Connecting...`);
-      addBleEvent('GATT', 'Box Connecting...');
-      setBoxDetails(createInitialDevice(bleDevice, 'BOX'));
-
-      bleDevice.addEventListener('gattserverdisconnected', () => handleBoxDisconnect());
-
-      const server = await bleDevice.gatt?.connect();
-      if (!server) throw new Error("GATT Server not found");
-      
-      addLog('SUCCESS', 'Connected to Wand Box GATT Server.');
-      addBleEvent('GATT', 'Box Connected');
-      const service = await server.getPrimaryService(WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN);
-      const batteryService = await server.getPrimaryService(WBDLProtocol.WAND_BOX.SERVICE_UUID_BATTERY);
-
-      addLog('INFO', 'Discovering Box characteristics...');
-      const commChar = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_COMM);
-      boxCommandCharacteristic.current = commChar;
-      const notifyChar = await service.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_NOTIFY);
-      const batteryChar = await batteryService.getCharacteristic(WBDLProtocol.WAND_BOX.CHAR_UUID_BATTERY_LEVEL);
-      
-      if (notifyChar.properties.notify) {
-        addLog('INFO', 'Starting Box notifications...');
-        await notifyChar.startNotifications();
-        notifyChar.addEventListener('characteristicvaluechanged', parseBoxData);
-        addLog('SUCCESS', 'Notifications enabled for Box.');
-      } else {
-        addLog('WARNING', 'Box characteristic does not support notifications.');
-      }
-      
-      // New: Subscribe to battery notifications as per WandBoxHelper.smali
-      if (batteryChar.properties.notify) {
-        addLog('INFO', 'Subscribing to Box battery notifications...');
-        await batteryChar.startNotifications();
-        batteryChar.addEventListener('characteristicvaluechanged', handleBoxBatteryLevel);
-        addLog('SUCCESS', 'Notifications enabled for Box Battery.');
-      } else {
-        addLog('WARNING', 'Box battery characteristic does not support notifications.');
-      }
-      
-      if (batteryChar.properties.read) {
-        addLog('INFO', 'Reading initial Box battery level...');
-        const initialBattery = await batteryChar.readValue();
-        const level = initialBattery.getUint8(0);
-        setBoxBatteryLevel(level); // Set initial level
-        addLog('SUCCESS', `Initial Box Battery Level: ${level}%`);
-      } else {
-        addLog('INFO', 'Cannot read initial Box battery level (property not supported). Waiting for notification.');
-      }
-
-      setBoxConnectionState(ConnectionState.CONNECTED);
-      addLog('SUCCESS', 'Wand Box connection fully established!');
-      
-      // New: Request info from the box, as confirmed by smali analysis of WandBoxHelper's `subscribeToBoxInfo`
-      addLog('INFO', 'Requesting firmware and product info from Wand Box...');
-      queueBoxCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
-      queueBoxCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
-
-    } catch (error) {
-       const errorMessage = error instanceof Error ? error.message : String(error);
-      addLog('ERROR', `Box Connection failed: ${errorMessage}`);
-      addBleEvent('Error', `Box connection failed: ${errorMessage}`);
-      setBoxConnectionState(ConnectionState.ERROR);
-      setBoxDetails(null);
-    }
-  }, [addLog, handleBoxDisconnect, parseBoxData, addBleEvent, queueBoxCommand, handleBoxBatteryLevel]);
-
-  const addVfxCommand = (type: VfxCommandType) => {
-    let params: VfxCommand['params'] = {};
-    if (type === 'LightTransition') {
-      params = { hex_color: '#ffffff', mode: 0, transition_ms: 1000 };
-    } else if (type === 'HapticBuzz' || type === 'MacroDelay') {
-      params = { duration_ms: 500 };
-    } else if (type === 'LoopEnd') {
-      params = { loops: 2 };
-    }
-    // LoopStart and LightClear have no params
-
-    const newCommand: VfxCommand = {
-      id: commandIdCounter.current++,
-      type,
-      params,
-    };
-    setVfxSequence([...vfxSequence, newCommand]);
-    setIsSequenceSaved(false);
-  };
-  
-  const updateVfxCommand = (id: number, updatedParams: VfxCommand['params']) => {
-    setVfxSequence(vfxSequence.map(cmd => cmd.id === id ? { ...cmd, params: { ...cmd.params, ...updatedParams } } : cmd));
-    setIsSequenceSaved(false);
-  };
-  
-  const removeVfxCommand = (id: number) => {
-    setVfxSequence(vfxSequence.filter(cmd => cmd.id !== id));
-    setIsSequenceSaved(false);
-  };
-
-  const saveVfxSequence = () => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_VFX, JSON.stringify(vfxSequence));
-      setIsSequenceSaved(true);
-      addLog('SUCCESS', 'VFX Sequence saved to local storage.');
-    } catch (error) {
-      addLog('ERROR', `Failed to save sequence: ${String(error)}`);
-    }
-  };
-  
-  const sendVfxSequence = React.useCallback(() => {
-    if (wandConnectionState !== ConnectionState.CONNECTED || !commandCharacteristic.current) {
-        addLog('ERROR', 'Cannot send VFX sequence: Wand not connected.');
-        return;
-    }
-
-    addLog('INFO', 'Building and sending VFX macro sequence...');
-    const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
-    let hasError = false;
-
-    vfxSequence.forEach(cmd => {
-      if (hasError) return;
-      switch (cmd.type) {
-        case 'LightClear':
-          payload.push(WBDLProtocol.INST.MACRO_LIGHT_CLEAR);
-          break;
-        case 'HapticBuzz': {
-          const duration = cmd.params.duration_ms ?? 100;
-          payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
-          break;
-        }
-        case 'MacroDelay': {
-          const duration = cmd.params.duration_ms ?? 100;
-          payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
-          break;
-        }
-        case 'LightTransition': {
-          const hex = cmd.params.hex_color ?? '#ffffff';
-          const mode = cmd.params.mode ?? 0;
-          const duration = cmd.params.transition_ms ?? 1000;
-          
-          if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-            addLog('ERROR', `Invalid hex color "${hex}" in VFX command. Aborting sequence.`);
-            hasError = true;
-            return;
-          }
-
-          const r = parseInt(hex.substring(1, 3), 16);
-          const g = parseInt(hex.substring(3, 5), 16);
-          const b = parseInt(hex.substring(5, 7), 16);
-          
-          payload.push(
-            WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
-            mode,
-            r, g, b,
-            duration & 0xFF,
-            (duration >> 8) & 0xFF
-          );
-          break;
-        }
-        case 'LoopStart':
-          payload.push(WBDLProtocol.INST.MACRO_LOOP_START);
-          break;
-        case 'LoopEnd': {
-          const loops = cmd.params.loops ?? 2;
-          payload.push(WBDLProtocol.INST.MACRO_SET_LOOPS, loops);
-          break;
-        }
-      }
-    });
-
-    if (hasError) return;
-
-    const finalPayload = new Uint8Array(payload);
-    
-    // Chunking logic based on negotiated MTU
-    if (finalPayload.length > negotiatedMtu) {
-        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${negotiatedMtu} bytes). Splitting into chunks.`);
-        for (let i = 0; i < finalPayload.length; i += negotiatedMtu) {
-            const chunk = finalPayload.slice(i, i + negotiatedMtu);
-            queueCommand(chunk);
-        }
-    } else {
-        queueCommand(finalPayload);
-    }
-  }, [vfxSequence, addLog, wandConnectionState, queueCommand, negotiatedMtu]);
-
-  const toggleImuStream = () => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-      addLog('ERROR', 'Wand not connected.');
-      return;
-    }
-    if (isImuStreaming) {
-      queueCommand(WBDLPayloads.IMU_STOP_STREAM_CMD);
-      addLog('INFO', 'Stopping IMU stream...');
-      setIsImuStreaming(false);
-      setLatestImuData(null);
-    } else {
-      queueCommand(WBDLPayloads.IMU_START_STREAM_CMD);
-      addLog('INFO', 'Starting IMU stream...');
-      setIsImuStreaming(true);
-    }
-  };
-  
-  const handleImuCalibrate = React.useCallback(() => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-      addLog('ERROR', 'Wand not connected.');
-      return;
-    }
-    addLog('INFO', 'Sending IMU calibration sequence...');
-    // New: Sequence from WandHelper.smali analysis. Send unlock, then calibrate.
-    queueCommand(WBDLPayloads.FACTORY_UNLOCK_CMD);
-    queueCommand(WBDLPayloads.IMU_CALIBRATE_CMD);
-  }, [wandConnectionState, addLog, queueCommand]);
-  
-  const sendButtonThresholds = React.useCallback((wandType: WandType) => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-      addLog('ERROR', 'Wand not connected. Cannot set button thresholds.');
-      return;
-    }
-    const thresholds = WAND_THRESHOLDS[wandType];
-    if (!thresholds) {
-      addLog('WARNING', `No threshold data available for wand type: ${wandType}`);
-      return;
-    }
-    
-    // Based on smali, the command is 0x70 followed by 4 pairs of min/max bytes
-    const payload = new Uint8Array([
-      WBDLProtocol.CMD.SET_BUTTON_THRESHOLD,
-      thresholds[0].min, thresholds[0].max,
-      thresholds[1].min, thresholds[1].max,
-      thresholds[2].min, thresholds[2].max,
-      thresholds[3].min, thresholds[3].max,
-    ]);
-
-    addLog('INFO', `Setting button thresholds for ${wandType} wand type.`);
-    queueCommand(payload);
-
-  }, [wandConnectionState, addLog, queueCommand]);
-  
-  const handleReadButtonThresholds = React.useCallback(() => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-        addLog('ERROR', 'Wand not connected.');
-        return;
-    }
-    addLog('INFO', 'Requesting button thresholds for all 4 buttons...');
-    for (let i = 0; i < 4; i++) {
-        queueCommand(new Uint8Array([WBDLProtocol.CMD.READ_BUTTON_THRESHOLD, i]));
-    }
-  }, [wandConnectionState, addLog, queueCommand]);
-
-  // When wand type is discovered, automatically send the appropriate thresholds
-  React.useEffect(() => {
-      if (wandDetails?.wandType && wandDetails.wandType !== 'UNKNOWN') {
-          sendButtonThresholds(wandDetails.wandType);
-      }
-  }, [wandDetails?.wandType, sendButtonThresholds]);
-
-
-  const analyzeSmaliWithGemini = async () => {
-    if (!smaliInput.trim()) {
-      addLog('WARNING', 'Smali input is empty.');
-      return;
-    }
-    setIsAnalyzingSmali(true);
-    setSmaliAnalysis('');
-    addLog('INFO', 'Analyzing smali with Gemini...');
-
-    try {
-        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-        const systemInstruction = `You are an expert reverse engineer specializing in Android smali code, specifically for Bluetooth Low Energy (BLE) protocols. Analyze the provided smali code snippet from a BLE-related application. Your analysis should focus on identifying key information relevant to the BLE protocol.
-
-Your response should be a concise summary in markdown format.
-
-Focus on identifying and explaining:
-- **Service and Characteristic UUIDs:** List any found UUIDs and their likely purpose (e.g., "Main control service," "Notification characteristic").
-- **Opcodes:** Identify any byte constants used as command identifiers (opcodes).
-- **Packet Structures:** Describe the format of any data packets being constructed or parsed.
-- **Protocol Logic:** Explain the sequence of operations or any interesting logic (e.g., "Sends opcode 0x50, then a 2-byte duration").
-- **Key Constants:** Point out any important numerical or string constants and their meaning in the protocol.
-
-Be precise and base your conclusions directly on the provided code.`;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: `Analyze this smali code:\n\n\`\`\`smali\n${smaliInput}\n\`\`\``,
-            config: {
-                systemInstruction: systemInstruction,
-            },
-        });
-        
-        setSmaliAnalysis(response.text);
-        addLog('SUCCESS', 'Smali analysis complete.');
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        addLog('ERROR', `Smali analysis failed: ${errorMessage}`);
-        setSmaliAnalysis(`**Error:** Could not analyze the smali code. ${errorMessage}`);
-    } finally {
-        setIsAnalyzingSmali(false);
-    }
-  };
-
-  const startBleExplorerScan = React.useCallback(async () => {
-      if (!navigator.bluetooth) {
-          addLog('ERROR', 'Web Bluetooth is not available.');
-          return;
-      }
-      setIsExploring(true);
-      setExplorerDevice(null);
-      setExplorerServices([]);
-      addLog('INFO', 'Starting BLE Explorer scan...');
-      try {
-          const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
-          addLog('SUCCESS', `Explorer: Found device "${device.name}". Connecting...`);
-          setExplorerDevice(device);
-          const server = await device.gatt?.connect();
-          if (!server) throw new Error('Could not connect to GATT server.');
-
-          addLog('INFO', 'Explorer: Discovering all primary services...');
-          const services = await server.getPrimaryServices();
-          addLog('SUCCESS', `Explorer: Found ${services.length} services.`);
-          
-          const discoveredServices: ExplorerService[] = [];
-          for (const service of services) {
-              addLog('INFO', `Explorer: Getting characteristics for service ${service.uuid}`);
-              try {
-                  const characteristics = await service.getCharacteristics();
-                  discoveredServices.push({
-                      uuid: service.uuid,
-                      characteristics: characteristics.map(char => ({
-                          uuid: char.uuid,
-                          properties: char.properties,
-                      })),
-                  });
-              } catch(e) {
-                  addLog('WARNING', `Explorer: Could not get characteristics for service ${service.uuid}. It may be protected.`);
-              }
-          }
-          setExplorerServices(discoveredServices);
-          addLog('SUCCESS', 'Explorer: Service discovery complete.');
-      } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          addLog('ERROR', `BLE Explorer failed: ${errorMessage}`);
-      } finally {
-          setIsExploring(false);
-      }
-  }, [addLog]);
-  
-  const sendMacroSequence = React.useCallback((commands: MacroCommand[], target: 'wand' | 'box') => {
-    const isWand = target === 'wand';
-    const connectionState = isWand ? wandConnectionState : boxConnectionState;
-    const char = isWand ? commandCharacteristic.current : boxCommandCharacteristic.current;
-    const queueFn = isWand ? queueCommand : queueBoxCommand;
-    const mtu = isWand ? negotiatedMtu : WBDLPayloads.MTU_PAYLOAD_SIZE;
-    const deviceName = isWand ? "Wand" : "Wand Box";
-
-    if (connectionState !== ConnectionState.CONNECTED || !char) {
-        addLog('ERROR', `Cannot send macro sequence: ${deviceName} not connected.`);
-        return;
-    }
-
-    addLog('INFO', `Building and sending VFX macro sequence to ${deviceName}...`);
-    // Assumption: The box uses the same MACRO_EXECUTE command prefix as the wand.
-    const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
-    let hasError = false;
-
-    commands.forEach(cmd => {
-        if (hasError) return;
-        
-        const loops = cmd.loops ?? 1;
-        for (let i = 0; i < loops; i++) {
-            switch (cmd.command) {
-                case 'LightClear':
-                    payload.push(WBDLProtocol.INST.MACRO_LIGHT_CLEAR);
-                    break;
-                case 'HapticBuzz': {
-                    const duration = cmd.duration ?? 100;
-                    payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
-                    break;
-                }
-                case 'MacroDelay': {
-                    const duration = cmd.duration ?? 100;
-                    payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
-                    break;
-                }
-                case 'LightTransition': {
-                    const hex = cmd.color ?? '#ffffff';
-                    const mode = cmd.group ?? 0; // 'group' in MacroCommand maps to 'mode'
-                    const duration = cmd.duration ?? 1000;
-                    
-                    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-                        addLog('ERROR', `Invalid hex color "${hex}" in macro command. Aborting sequence.`);
-                        hasError = true;
-                        return;
-                    }
-
-                    const r = parseInt(hex.substring(1, 3), 16);
-                    const g = parseInt(hex.substring(3, 5), 16);
-                    const b = parseInt(hex.substring(5, 7), 16);
-                    
-                    payload.push(
-                        WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
-                        mode, r, g, b,
-                        duration & 0xFF, (duration >> 8) & 0xFF
-                    );
-                    break;
-                }
-                default:
-                    addLog('WARNING', `Unknown command in macro sequence: ${cmd.command}`);
-                    break;
-            }
-        }
-    });
-
-    if (hasError) return;
-
-    const finalPayload = new Uint8Array(payload);
-    
-    if (finalPayload.length > mtu) {
-        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${mtu} bytes) for ${deviceName}. Splitting into chunks.`);
-        for (let i = 0; i < finalPayload.length; i += mtu) {
-            const chunk = finalPayload.slice(i, i + negotiatedMtu);
-            queueFn(chunk);
-        }
-    } else {
-        queueFn(finalPayload);
-    }
-  }, [wandConnectionState, boxConnectionState, queueCommand, queueBoxCommand, negotiatedMtu, addLog]);
-  
-  const castSpellOnWand = React.useCallback((spellDetails: SpellDetails | null) => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-        addLog('ERROR', 'Wand not connected.');
-        return;
-    }
-    if (!spellDetails || !spellDetails.config_wand?.macros_payoff || spellDetails.config_wand.macros_payoff.length === 0) {
-        addLog('WARNING', `No wand macro found for spell ${spellDetails?.spell_name}.`);
-        return;
-    }
-
-    const deviceType = 'WAND';
-
-    const currentIndex = macroIndexes.current[deviceType] ?? -1;
-    const nextIndex = (currentIndex + 1) % spellDetails.config_wand.macros_payoff.length;
-    macroIndexes.current[deviceType] = nextIndex;
-
-    const macroVariation = spellDetails.config_wand.macros_payoff[nextIndex];
-
-    addLog('INFO', `Casting '${spellDetails.spell_name}' on Wand. Executing macro variation ${nextIndex + 1}/${spellDetails.config_wand.macros_payoff.length}.`);
-
-    sendMacroSequence(macroVariation, 'wand');
-  }, [addLog, wandConnectionState, sendMacroSequence]);
-
-  const castSpellOnBox = React.useCallback((spellDetails: SpellDetails | null) => {
-    if (boxConnectionState !== ConnectionState.CONNECTED) {
-        addLog('ERROR', 'Wand Box not connected.');
-        return;
-    }
-     if (!spellDetails || !spellDetails.config_wandbox?.macros_payoff || spellDetails.config_wandbox.macros_payoff.length === 0) {
-        addLog('WARNING', `No box macro found for spell ${spellDetails?.spell_name}.`);
-        return;
-    }
-
-    const deviceType = 'BOX';
-
-    const currentIndex = macroIndexes.current[deviceType] ?? -1;
-    const nextIndex = (currentIndex + 1) % spellDetails.config_wandbox.macros_payoff.length;
-    macroIndexes.current[deviceType] = nextIndex;
-
-    const macroVariation = spellDetails.config_wandbox.macros_payoff[nextIndex];
-
-    addLog('INFO', `Activating '${spellDetails.spell_name}' on Box. Executing macro variation ${nextIndex + 1}/${spellDetails.config_wandbox.macros_payoff.length}.`);
-
-    sendMacroSequence(macroVariation, 'box');
-  }, [addLog, boxConnectionState, sendMacroSequence]);
-
-  React.useEffect(() => {
-    if (
-      spellDetails &&
-      lastSpell?.isLive &&
-      boxConnectionState === ConnectionState.CONNECTED &&
-      spellDetails.spell_name.toUpperCase().replace(/_/g, '') === lastSpell.name.toUpperCase().replace(/_/g, '')
-    ) {
-      addLog('INFO', `Wand cast detected. Triggering automatic reaction on Wand Box for "${spellDetails.spell_name}".`);
-      castSpellOnBox(spellDetails);
-      setLastSpell(prev => (prev ? { ...prev, isLive: false } : null));
-    }
-  }, [spellDetails, lastSpell, boxConnectionState, castSpellOnBox, addLog]);
-
-
-  const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
-    if (!spellName) return;
-    setIsFetchingCompendiumDetails(true);
-    setCompendiumError(null);
-    setCompendiumSpellDetails(null);
-    addLog('INFO', `Compendium: Fetching details for ${spellName}...`);
-    try {
-       const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-       
-       const responseSchema = {
-           type: Type.OBJECT,
-           properties: {
-                spell_name: { type: Type.STRING },
-                incantation_name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                spell_type: { type: Type.STRING },
-                difficulty: { type: Type.INTEGER },
-                spell_background_color: { type: Type.STRING },
-                spell_uses: { type: Type.ARRAY, items: {
-                    type: Type.OBJECT, properties: {
-                        id: { type: Type.STRING },
-                        name: { type: Type.STRING },
-                        icon: { type: Type.STRING }
-                    }, required: ["id", "name", "icon"]
-                }},
-                config_wand: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-                config_wandbox: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-           },
-           required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "config_wand", "config_wandbox"]
-       };
-
-      const systemInstruction = `You are a magical archivist. Based on the provided spell name, return a complete JSON object representing the spell's data, conforming to the schema. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
-        contents: `Provide the full spell data object for: "${spellName}".`,
-        config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-        },
-      });
-
-      const jsonText = response.text;
-      const details = JSON.parse(jsonText) as SpellDetails;
-      setCompendiumSpellDetails(details);
-      addLog('SUCCESS', `Compendium: Successfully fetched details for ${spellName}.`);
-
-    } catch (error) {
-       const errorMessage = error instanceof Error ? error.message : String(error);
-       setCompendiumError(`Failed to fetch compendium data: ${errorMessage}`);
-       addLog('ERROR', `Compendium: ${errorMessage}`);
-    } finally {
-        setIsFetchingCompendiumDetails(false);
-    }
-  }, [addLog]);
-
-  React.useEffect(() => {
-    if (selectedCompendiumSpell) {
-        fetchCompendiumDetails(selectedCompendiumSpell);
-    }
-  }, [selectedCompendiumSpell, fetchCompendiumDetails]);
-  
-  const handleFinishTutorial = React.useCallback(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_TUTORIAL, 'true');
-      setShowTutorial(false);
-      addLog('INFO', 'Tutorial completed. Welcome!');
-    } catch (error) {
-      addLog('ERROR', `Failed to save tutorial status: ${String(error)}`);
-      setShowTutorial(false); // Hide it anyway
-    }
-  }, [addLog]);
-
-  const handleResetTutorial = React.useCallback(() => {
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY_TUTORIAL);
-      setShowTutorial(true);
-      addLog('INFO', 'Tutorial has been reset and will show again.');
-    } catch (error) {
-      addLog('ERROR', `Failed to reset tutorial status: ${String(error)}`);
-    }
-  }, [addLog]);
-  
-  const handleUnlockAllSpells = React.useCallback(() => {
-    addLog('INFO', 'Unlocking all spells...');
-    const discoveredNames = new Set(spellBook.map(s => s.name));
-    const spellsToUnlock = SPELL_LIST
-        .filter(name => !discoveredNames.has(name))
-        .map(name => ({ name, firstSeen: new Date().toISOString() }));
-
-    if (spellsToUnlock.length > 0) {
-        setSpellBook(prevBook => [...prevBook, ...spellsToUnlock]);
-        addLog('SUCCESS', `Unlocked ${spellsToUnlock.length} new spells!`);
-    } else {
-        addLog('INFO', 'All spells were already unlocked.');
-    }
-  }, [spellBook, addLog]);
-  
-  const handleSendBoxTestMacro = React.useCallback(() => {
-    addLog('INFO', 'Sending test macro to Wand Box...');
-    const testMacro: MacroCommand[] = [
-        { command: 'LightTransition', color: '#0000FF', duration: 500, group: 0 },
-        { command: 'MacroDelay', duration: 200 },
-        { command: 'LightTransition', color: '#000000', duration: 500, group: 0 },
-    ];
-    sendMacroSequence(testMacro, 'box');
-  }, [addLog, sendMacroSequence]);
-
-  const handleRequestBoxAddress = React.useCallback(() => {
-    if (wandConnectionState !== ConnectionState.CONNECTED) {
-        addLog('ERROR', 'Wand not connected.');
-        return;
-    }
-    addLog('INFO', 'Requesting companion box address from wand...');
-    queueCommand(WBDLPayloads.BOX_ADDRESS_REQUEST_CMD);
-  }, [wandConnectionState, addLog, queueCommand]);
-
-
-
-  // --- RENDER ---
-  
-  const renderTab = () => {
+  const renderCurrentTab = () => {
     switch (activeTab) {
-      case 'control_hub': return <ControlHub 
-        lastSpell={lastSpell?.name || ''} 
-        gestureState={gestureState} 
-        clientSideGestureDetected={clientSideGestureDetected}
-        spellDetails={spellDetails}
-        isFetchingSpellDetails={isFetchingSpellDetails}
-        spellDetailsError={spellDetailsError}
-        vfxSequence={vfxSequence}
-        addVfxCommand={addVfxCommand}
-        updateVfxCommand={updateVfxCommand}
-        removeVfxCommand={removeVfxCommand}
-        sendVfxSequence={sendVfxSequence}
-        saveVfxSequence={saveVfxSequence}
-        isSequenceSaved={isSequenceSaved}
-        wandConnectionState={wandConnectionState}
-        boxConnectionState={boxConnectionState}
-        liveEvent={liveEvent}
-        castingHistory={castingHistory}
-        onCastOnWand={castSpellOnWand}
-        onCastOnBox={castSpellOnBox}
-      />;
-      case 'device_manager': return <DeviceManager 
+      case 'control_hub':
+        return <ControlHub 
+          lastSpell={lastSpell?.name || 'None'}
+          gestureState={gestureState}
+          clientSideGestureDetected={clientSideGestureDetected}
+          spellDetails={spellDetails}
+          isFetchingSpellDetails={isFetchingSpellDetails}
+          spellDetailsError={spellDetailsError}
+          vfxSequence={vfxSequence}
+          addVfxCommand={() => {}}
+          updateVfxCommand={() => {}}
+          removeVfxCommand={() => {}}
+          sendVfxSequence={() => {}}
+          saveVfxSequence={() => {}}
+          isSequenceSaved={isSequenceSaved}
+          wandConnectionState={wandConnectionState}
+          boxConnectionState={boxConnectionState}
+          liveEvent={liveEvent}
+          onCastOnWand={onCastOnWand}
+          onCastOnBox={onCastOnBox}
+          castingHistory={castingHistory}
+        />;
+      case 'device_manager':
+        return <DeviceManager 
           wandConnectionState={wandConnectionState}
           boxConnectionState={boxConnectionState}
           wandDetails={wandDetails}
           boxDetails={boxDetails}
           wandBatteryLevel={wandBatteryLevel}
           boxBatteryLevel={boxBatteryLevel}
-          onConnectWand={() => { setDeviceToScan('wand'); setIsScannerOpen(true); }}
-          onConnectBox={() => { setDeviceToScan('box'); setIsScannerOpen(true); }}
+          onConnectWand={() => connectToDevice('wand')}
+          onConnectBox={() => connectToDevice('box')}
           rawWandProductInfo={rawWandProductInfo}
           rawBoxProductInfo={rawBoxProductInfo}
           isTvBroadcastEnabled={isTvBroadcastEnabled}
@@ -2999,138 +2378,115 @@ Be precise and base your conclusions directly on the provided code.`;
           negotiatedMtu={negotiatedMtu}
           commandDelay_ms={commandDelay_ms}
           setCommandDelay_ms={setCommandDelay_ms}
-          onResetTutorial={handleResetTutorial}
-          onSendBoxTestMacro={handleSendBoxTestMacro}
-          onRequestBoxAddress={handleRequestBoxAddress}
-      />;
-      case 'diagnostics': return <Diagnostics 
-        detectedOpCodes={detectedOpCodes}
-        rawPacketLog={rawPacketLog}
-        bleEventLog={bleEventLog}
-        isImuStreaming={isImuStreaming}
-        toggleImuStream={toggleImuStream}
-        handleImuCalibrate={handleImuCalibrate}
-        latestImuData={latestImuData}
-        buttonState={buttonState}
-        smaliInput={smaliInput}
-        setSmaliInput={setSmaliInput}
-        analyzeSmaliWithGemini={analyzeSmaliWithGemini}
-        isAnalyzingSmali={isAnalyzingSmali}
-        smaliAnalysis={smaliAnalysis}
-        isClientSideGestureDetectionEnabled={isClientSideGestureDetectionEnabled}
-        setIsClientSideGestureDetectionEnabled={setIsClientSideGestureDetectionEnabled}
-        gestureThreshold={gestureThreshold}
-        setGestureThreshold={setGestureThreshold}
-        clientSideGestureDetected={clientSideGestureDetected}
-        buttonThresholds={buttonThresholds}
-        handleReadButtonThresholds={handleReadButtonThresholds}
-        wandConnectionState={wandConnectionState}
-        queueCommand={queueCommand}
-      />;
-      case 'compendium': return <SpellCompendium
-          spellBook={spellBook}
-          castingHistory={castingHistory}
-          onSelectSpell={(spell) => {
-              setSelectedCompendiumSpell(spell);
-              setIsCompendiumModalOpen(true);
+          onResetTutorial={() => {
+            localStorage.removeItem(LOCAL_STORAGE_KEY_TUTORIAL);
+            setShowTutorial(true);
           }}
-          onUnlockAll={handleUnlockAllSpells}
-      />;
-      case 'explorer': return <BleExplorer 
-          onScan={startBleExplorerScan}
+          onSendBoxTestMacro={() => sendMacroSequence(SPELL_REACTION_MACROS['DEFAULT'][0], 'box')}
+          onRequestBoxAddress={() => queueCommand(WBDLPayloads.BOX_ADDRESS_REQUEST_CMD)}
+        />;
+      case 'diagnostics':
+        return <Diagnostics 
+            detectedOpCodes={detectedOpCodes}
+            rawPacketLog={rawPacketLog}
+            bleEventLog={bleEventLog}
+            isImuStreaming={isImuStreaming}
+            toggleImuStream={() => {
+                const newStreamingState = !isImuStreaming;
+                queueCommand(newStreamingState ? WBDLPayloads.IMU_START_STREAM_CMD : WBDLPayloads.IMU_STOP_STREAM_CMD);
+                setIsImuStreaming(newStreamingState);
+                if (!newStreamingState) setLatestImuData(null); // Clear data on stop
+            }}
+            handleImuCalibrate={() => queueCommand(WBDLPayloads.IMU_CALIBRATE_CMD)}
+            latestImuData={latestImuData}
+            buttonState={buttonState}
+            smaliInput={smaliInput}
+            setSmaliInput={setSmaliInput}
+            analyzeSmaliWithGemini={() => {}}
+            isAnalyzingSmali={isAnalyzingSmali}
+            smaliAnalysis={smaliAnalysis}
+            isClientSideGestureDetectionEnabled={isClientSideGestureDetectionEnabled}
+            setIsClientSideGestureDetectionEnabled={setIsClientSideGestureDetectionEnabled}
+            gestureThreshold={gestureThreshold}
+            setGestureThreshold={setGestureThreshold}
+            clientSideGestureDetected={clientSideGestureDetected}
+            buttonThresholds={buttonThresholds}
+            handleReadButtonThresholds={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.READ_BUTTON_THRESHOLD]))}
+            wandConnectionState={wandConnectionState}
+            queueCommand={queueCommand}
+        />;
+      case 'compendium':
+        return <SpellCompendium
+            spellBook={spellBook}
+            castingHistory={castingHistory}
+            onSelectSpell={(spellName) => {
+              setLastSpell({ name: spellName, isLive: false });
+              setActiveTab('control_hub');
+            }}
+            onUnlockAll={() => {
+              const allSpells: Spell[] = SPELL_LIST.map(name => ({
+                name,
+                firstSeen: new Date().toISOString()
+              }));
+              setSpellBook(allSpells);
+              addLog('SUCCESS', 'All spells unlocked!');
+            }}
+        />;
+      case 'explorer':
+        return <BleExplorer 
+          onScan={() => {}}
           isExploring={isExploring}
           device={explorerDevice}
           services={explorerServices}
-      />;
-      case 'scripter': return <Scripter addLog={addLog} />;
-      default: return null;
-    }
-  }
-
-  const handleScanRequest = () => {
-    if (deviceToScan === 'wand') {
-      connectToWand();
-    } else if (deviceToScan === 'box') {
-      connectToBox();
+        />;
+      case 'scripter':
+        return <Scripter addLog={addLog} />;
+      default:
+        return <div>Select a tab</div>;
     }
   };
-  
 
   return (
-    <div className="min-h-screen flex flex-col p-4 bg-slate-900 text-slate-200 gap-4">
-      {showTutorial && <TutorialModal onFinish={handleFinishTutorial} />}
-      {isScannerOpen && (
-        <Modal title={`Scan for ${deviceToScan === 'wand' ? 'Wand' : 'Wand Box'}`} onClose={() => setIsScannerOpen(false)}>
-          <div className="text-center p-8">
-            <ScanIcon />
-            <h3 className="text-xl font-semibold mb-2">Ready to Connect</h3>
-            <p className="text-slate-400 mb-6">
-              Click the button below to open your browser's Bluetooth device picker. Select the device named "MCW" for the Wand or "MCB" for the Box.
-            </p>
-            <button
-              onClick={handleScanRequest}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg"
-            >
-              Scan for Devices
-            </button>
-          </div>
-        </Modal>
-      )}
-      
-      {isCompendiumModalOpen && selectedCompendiumSpell && (
-        <Modal title={`Spell Compendium: ${selectedCompendiumSpell}`} onClose={() => { setIsCompendiumModalOpen(false); setSelectedCompendiumSpell(null); }}>
-          <SpellDetailsCard 
-              spellDetails={compendiumSpellDetails}
-              isLoading={isFetchingCompendiumDetails}
-              error={compendiumError}
-              onCastOnWand={castSpellOnWand}
-              onCastOnBox={castSpellOnBox}
-              isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
-              isBoxConnected={boxConnectionState === ConnectionState.CONNECTED}
+    <div className="flex h-screen bg-slate-900 text-slate-200">
+      {showTutorial && <TutorialModal onFinish={() => {
+        setShowTutorial(false);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY_TUTORIAL, 'true');
+        } catch(e) {
+          addLog('ERROR', 'Failed to save tutorial completion status.');
+        }
+      }} />}
+      {/* Left Sidebar */}
+      <div className="w-64 bg-slate-800 p-4 flex flex-col space-y-4 border-r border-slate-700">
+        <h1 className="text-2xl font-bold text-center text-indigo-400">Magic Wand</h1>
+        <nav className="flex-grow space-y-2">
+          <TabButton Icon={LinkIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
+          <TabButton Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
+          <TabButton Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
+          <TabButton Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
+          <TabButton Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
+          <TabButton Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />
+        </nav>
+        <div className="flex-shrink-0">
+          <SpellBook 
+            spellBook={spellBook}
+            discoveredSpells={new Set(spellBook.map(s => s.name))}
+            discoveredCount={spellBook.length}
+            totalCount={SPELL_LIST.length}
+            spellFilter={spellFilter}
+            setSpellFilter={setSpellFilter}
+            castingHistory={castingHistory}
           />
-        </Modal>
-      )}
-
-      <header className="flex-shrink-0">
-        <h1 className="text-3xl font-bold text-center mb-1 text-slate-100">Magic Wand BLE Controller</h1>
-        <p className="text-center text-slate-400 text-sm">Reverse Engineering & Control Hub</p>
-      </header>
-
-      <main className="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
-        <div className="flex-shrink-0 md:w-1/4 flex flex-col gap-4">
-            <div className="flex-shrink-0 bg-slate-800 p-4 rounded-lg border border-slate-700">
-                <h2 className="text-lg font-semibold mb-3">Navigation</h2>
-                <div className="flex flex-col gap-2">
-                    <TabButton key="control_hub" Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
-                    <TabButton key="device_manager" Icon={CubeIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
-                    <TabButton key="diagnostics" Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
-                    <TabButton key="compendium" Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
-                    <TabButton key="explorer" Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
-                    <TabButton key="scripter" Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />
-                </div>
-            </div>
-            <div className="flex-grow min-h-0">
-                 <SpellBook 
-                    spellBook={spellBook}
-                    discoveredSpells={discoveredSpells}
-                    discoveredCount={discoveredSpells.size}
-                    totalCount={SPELL_LIST.length}
-                    spellFilter={spellFilter}
-                    setSpellFilter={setSpellFilter}
-                    castingHistory={castingHistory}
-                 />
-            </div>
         </div>
-        
-        <div className="flex-grow bg-slate-800 p-4 rounded-lg border border-slate-700 min-w-0 min-h-0">
-          {renderTab()}
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col p-4 overflow-hidden">
+        <div className="flex-grow overflow-hidden">
+          {renderCurrentTab()}
         </div>
-        
-        <div className="flex-shrink-0 md:w-1/3 flex flex-col gap-4">
-          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 flex-grow">
-            <h2 className="text-lg font-semibold mb-2">Logs</h2>
-            <LogView logs={logs} />
-          </div>
+        <div className="flex-shrink-0 h-48 mt-4">
+          <LogView logs={logs} />
         </div>
       </main>
     </div>
