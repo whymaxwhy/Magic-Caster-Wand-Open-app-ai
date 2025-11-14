@@ -1038,6 +1038,64 @@ const Diagnostics: React.FC<any> = ({
     );
 };
 
+interface WandTrackerProps {
+  imuReading: IMUReading | null;
+}
+
+const WandTracker: React.FC<WandTrackerProps> = ({ imuReading }) => {
+  const trackerSize = 120; // in pixels
+  const dotSize = 12; // in pixels
+  const maxG = 1.5; // Clamp accelerometer reading to this value for tracker range
+
+  const getPosition = () => {
+    // Default to center if no data
+    if (!imuReading) {
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+    }
+
+    const clamp = (val: number, min: number, max: number) => Math.max(min, Math.min(val, max));
+
+    // Use accelerometer data for tilt; invert Y because screen coordinates are top-down
+    const ax = clamp(imuReading.acceleration.x, -maxG, maxG);
+    const ay = clamp(-imuReading.acceleration.y, -maxG, maxG);
+
+    // Calculate the pixel offset based on the clamped G-force value
+    const radius = (trackerSize - dotSize) / 2;
+    const offsetX = (ax / maxG) * radius;
+    const offsetY = (ay / maxG) * radius;
+
+    return {
+      top: `calc(50% + ${offsetY}px)`,
+      left: `calc(50% + ${offsetX}px)`,
+      transform: 'translate(-50%, -50%)',
+    };
+  };
+
+  const dotStyle = getPosition();
+
+  return (
+    <div className="mt-4 pt-4 border-t border-slate-700/50">
+      <h4 className="text-sm font-semibold text-slate-400 mb-2 text-center">Wand Orientation Tracker</h4>
+      <div
+        className="mx-auto bg-slate-950 rounded-full border-2 border-slate-700 relative"
+        style={{ width: trackerSize, height: trackerSize }}
+        aria-label="Wand orientation tracker"
+      >
+        {/* Helper lines for orientation */}
+        <div className="absolute top-1/2 left-0 w-full h-px bg-slate-700/50 -translate-y-1/2"></div>
+        <div className="absolute left-1/2 top-0 h-full w-px bg-slate-700/50 -translate-x-1/2"></div>
+        {/* The indicator dot */}
+        <div
+          className="absolute bg-indigo-400 rounded-full shadow-lg shadow-indigo-500/50 transition-all duration-75 ease-out"
+          style={{ width: dotSize, height: dotSize, ...dotStyle }}
+          role="img"
+          aria-label="Wand position indicator"
+        ></div>
+      </div>
+    </div>
+  );
+};
+
 interface DeviceManagerProps {
   wandConnectionState: ConnectionState;
   boxConnectionState: ConnectionState;
@@ -1070,6 +1128,8 @@ interface DeviceManagerProps {
   onResetTutorial: () => void;
   onSendBoxTestMacro: () => void;
   onRequestBoxAddress: () => void;
+  latestImuData: IMUReading[] | null;
+  isImuStreaming: boolean;
 }
 
 const DeviceCard: React.FC<{
@@ -1079,8 +1139,10 @@ const DeviceCard: React.FC<{
   onConnect: () => void,
   details: WandDevice | null,
   batteryLevel: number | null,
-  rawProductInfo: string | null
-}> = ({ title, icon, connectionState, onConnect, details, batteryLevel, rawProductInfo }) => (
+  rawProductInfo: string | null,
+  isImuStreaming: boolean,
+  latestImuReading: IMUReading | null,
+}> = ({ title, icon, connectionState, onConnect, details, batteryLevel, rawProductInfo, isImuStreaming, latestImuReading }) => (
   <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
     <div className="flex justify-between items-start mb-3">
       <div className="flex items-center">
@@ -1120,6 +1182,9 @@ const DeviceCard: React.FC<{
             <h4 className="text-xs font-semibold text-slate-400 mb-1">Raw Product Info Packets</h4>
             <pre className="bg-slate-950 p-2 rounded text-xs font-mono max-h-24 overflow-y-auto border border-slate-600">{rawProductInfo || 'No product info received yet.'}</pre>
         </div>
+        {isImuStreaming && title === "Magic Wand" && (
+            <WandTracker imuReading={latestImuReading} />
+        )}
       </div>
     )}
   </div>
@@ -1131,7 +1196,7 @@ const DeviceManager: React.FC<DeviceManagerProps> = ({
   setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled,
   setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId,
   setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial,
-  onSendBoxTestMacro, onRequestBoxAddress
+  onSendBoxTestMacro, onRequestBoxAddress, latestImuData, isImuStreaming
 }) => (
   <div className="h-full flex flex-col space-y-4 overflow-y-auto">
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1143,6 +1208,8 @@ const DeviceManager: React.FC<DeviceManagerProps> = ({
         details={wandDetails}
         batteryLevel={wandBatteryLevel}
         rawProductInfo={rawWandProductInfo}
+        isImuStreaming={isImuStreaming}
+        latestImuReading={latestImuData?.[latestImuData.length - 1] || null}
       />
       <DeviceCard 
         title="Wand Box"
@@ -1152,6 +1219,8 @@ const DeviceManager: React.FC<DeviceManagerProps> = ({
         details={boxDetails}
         batteryLevel={boxBatteryLevel}
         rawProductInfo={rawBoxProductInfo}
+        isImuStreaming={false}
+        latestImuReading={null}
       />
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1561,9 +1630,10 @@ export default function App() {
 
       const systemInstruction = `You are a magical archivist providing data about spells from a wizarding world. For a given spell name, you must return a single, valid JSON object with details about that spell, conforming to the provided schema. The 'spell_name' in the response should be the same as the input spell name, formatted in uppercase. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
 
+      // FIX: Changed `contents` to a Part array to resolve ambiguity with complex response schemas.
       const response: GenerateContentResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Provide the details for the spell: "${spellName}".`,
+        contents: [{text: `Provide the details for the spell: "${spellName}".`}],
         config: {
           systemInstruction: systemInstruction,
           responseMimeType: "application/json",
@@ -1935,7 +2005,9 @@ export default function App() {
           const duration = cmd.duration || 500;
           const vibIntensity = 0x58; // Standard intensity from smali
           // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-          instructionBytes = [WBDLProtocol.CMD.HAPTIC_VIBRATE, vibIntensity, Math.round(duration / 255)];
+          // Refactored to avoid potential TypeScript parser issues with complex expressions inside array literals.
+          const durationInProtocolUnits = Math.round(duration / 255);
+          instructionBytes = [WBDLProtocol.CMD.HAPTIC_VIBRATE, vibIntensity, durationInProtocolUnits];
           break;
         }
         case 'MacroDelay': {
@@ -2384,6 +2456,8 @@ export default function App() {
           }}
           onSendBoxTestMacro={() => sendMacroSequence(SPELL_REACTION_MACROS['DEFAULT'][0], 'box')}
           onRequestBoxAddress={() => queueCommand(WBDLPayloads.BOX_ADDRESS_REQUEST_CMD)}
+          latestImuData={latestImuData}
+          isImuStreaming={isImuStreaming}
         />;
       case 'diagnostics':
         return <Diagnostics 
