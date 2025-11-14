@@ -177,7 +177,12 @@ export interface SpellDetails {
   difficulty: number;
   spell_background_color: string;
   spell_uses: SpellUse[];
-  macros_payoff?: MacroCommand[][];
+  config_wand?: {
+    macros_payoff?: MacroCommand[][];
+  };
+  config_wandbox?: {
+    macros_payoff?: MacroCommand[][];
+  };
 }
 
 export interface ExplorerCharacteristic {
@@ -201,4 +206,11 @@ export interface RawPacket {
 export interface ButtonThresholds {
     min: number | null;
     max: number | null;
+}
+
+// New: Type for spell casting history
+export interface CastingHistoryEntry {
+  id: number;
+  name: string;
+  timestamp: string;
 }

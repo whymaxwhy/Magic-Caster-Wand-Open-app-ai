@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { WBDLProtocol, WBDLPayloads } from './constants';
@@ -11,20 +9,20 @@ interface ScripterProps {
 
 const CodeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20 l 4 -16 m 4 4 l 4 4 -4 4 M 6 16 l -4 -4 4 -4" />
+        {/* FIX: Corrected malformed SVG path data which could cause parsing errors. */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
     </svg>
 );
 
 const ClipboardIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v2 m -6 12h8a2 2 0 0 0 2 -2v-8a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2m-6 12h8a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2Z" />
     </svg>
 );
 
 const CheckIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13 l 4 4 L 19 7" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
     </svg>
 );
 
@@ -32,192 +30,119 @@ const CheckIcon = () => (
 const Scripter: React.FC<ScripterProps> = ({ addLog }) => {
   const [prompt, setPrompt] = useState('');
   const [generatedScript, setGeneratedScript] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [targetDevice, setTargetDevice] = useState<'wand' | 'box'>('wand');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [wasCopied, setWasCopied] = useState(false);
 
-  const handleGenerateScript = useCallback(async () => {
+  const generateScript = useCallback(async () => {
     if (!prompt.trim()) {
-      addLog('WARNING', 'Please enter a description for the script.');
+      addLog('WARNING', 'Prompt is empty.');
       return;
     }
-    
-    setIsLoading(true);
+    setIsGenerating(true);
     setGeneratedScript('');
-    addLog('INFO', `Sending prompt to Gemini for ${targetDevice}: "${prompt}"`);
+    addLog('INFO', 'Generating Python script with Gemini...');
 
+    const protocolSummary = `
+      - Service UUID: ${WBDLProtocol.SERVICE_UUID_WAND_CONTROL}
+      - Characteristic for Write/Notify: ${WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1}
+      - Opcodes (Hex):
+        - HAPTIC_VIBRATE: 0x${WBDLProtocol.CMD.HAPTIC_VIBRATE.toString(16)}
+        - LIGHT_CLEAR_ALL: 0x${WBDLProtocol.CMD.LIGHT_CLEAR_ALL.toString(16)}
+        - MACRO_EXECUTE: 0x${WBDLProtocol.CMD.MACRO_EXECUTE.toString(16)}
+      - Macro Instructions (inside a MACRO_EXECUTE payload):
+        - MACRO_DELAY: 0x${WBDLProtocol.INST.MACRO_DELAY.toString(16)}
+        - MACRO_LIGHT_TRANSITION: 0x${WBDLProtocol.INST.MACRO_LIGHT_TRANSITION.toString(16)}
+    `;
+
+    const systemInstruction = `You are a Python code generation assistant. Your task is to write a Python script that uses the 'bleak' library to interact with a Magic Wand BLE device. The user will provide a high-level goal, and you must generate a complete, runnable Python script to achieve it.
+
+      **Key requirements:**
+      1.  The script must use 'asyncio' and the 'bleak' library.
+      2.  The target device has the service and characteristic UUIDs provided in the context.
+      3.  You must use the provided opcodes and instruction constants to build command payloads.
+      4.  The script should define the necessary UUIDs and the characteristic to write to.
+      5.  It should include a 'main' async function that scans for the device (by name prefix "MCW"), connects, performs the requested action, and then disconnects.
+      6.  Include comments explaining the structure of the command payloads you construct.
+      7.  Wrap the code in a markdown block for Python. Do not add any conversational text outside the code block.
+    `;
+    
     try {
-      // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-
-      const isWand = targetDevice === 'wand';
-      const deviceName = isWand ? "Magic Wand" : "Wand Box";
-      const namePrefix = isWand ? WBDLProtocol.TARGET_NAME : WBDLProtocol.WAND_BOX.TARGET_NAME;
-      const serviceUUID = isWand ? WBDLProtocol.SERVICE_UUID_WAND_CONTROL : WBDLProtocol.WAND_BOX.SERVICE_UUID_MAIN;
-      const charUUID = isWand ? WBDLProtocol.CHAR_UUID_WAND_COMM_CHANNEL_1 : WBDLProtocol.WAND_BOX.CHAR_UUID_COMM;
-
-      const systemInstruction = `You are an expert Python developer specializing in Bluetooth Low Energy (BLE) communication using the 'bleak' library. Your task is to write a Python script to control a specific BLE device, the "${deviceName}".
-
-# Core BLE Protocol Information
-- Device Name Prefix: "${namePrefix}"
-- Primary Service UUID: "${serviceUUID}"
-- Command Characteristic UUID (for writing commands): "${charUUID}"
-
-# Known Commands & Opcodes
-- Simple Commands (sent directly):
-${JSON.stringify(WBDLPayloads, (key, value) => key === 'KEEPALIVE_COMMAND' ? undefined : value, 2)}
-- Macro Instruction Opcodes (used within a 0x68 MACRO_EXECUTE command):
-${JSON.stringify({ INST: WBDLProtocol.INST }, null, 2)}
-- Direct Command Opcodes:
-${JSON.stringify({ CMD: WBDLProtocol.CMD }, null, 2)}
-
-# The Spell Data Model (from firmware analysis)
-The native app uses a complex 'Spell' data model, delivered inside a 'SpellBook' JSON object. The 'SpellBook' simply contains a list of 'Spell' objects under a key named 'spells'. All property names in the JSON are snake_case.
-
-A single 'Spell' object contains general info, asset links, and crucially, configuration objects for different devices:
-- 'config_wand': Defines effects for the wand.
-- 'config_wandbox': Defines effects for the wand storage box.
-- Other configs like 'config_smartlamp' also exist.
-
-Both 'config_wand' and 'config_wandbox' contain a key named 'macros_payoff'. Firmware analysis confirms the structure of 'macros_payoff' is a list of macro variations.
-- **Structure:** \`List<List<Command>>\`. The outer list holds different variations of the spell effect. The inner list is a sequence of commands for one specific variation.
-- **Behavior:** The native application cycles through the variations (the outer list) with each cast of the same spell. When generating a script, you should typically pick the first variation (index 0) as a representative example unless the user specifies otherwise.
-
-A 'Command' object within a macro variation has the following confirmed properties:
-- 'command': (String) The name of the command (e.g., 'LightTransition', 'HapticBuzz', 'MacroDelay').
-- 'color': (String) Hex color code for light commands (e.g., "#FF0000").
-- 'group': (Integer) An integer ID, likely for targeting a specific LED group or effect parameter.
-- 'loops': (Integer) The number of times to repeat the command.
-- 'duration': (Double) The duration for the command in milliseconds.
-
-When a user asks to replicate a spell, you must infer a plausible 'macros_payoff' sequence for the '${isWand ? 'config_wand' : 'config_wandbox'}' and generate the Python script to send that sequence.
-
-# Script Generation Rules
-Based on the user's request, generate a complete, runnable Python script using 'asyncio' and 'bleak'.
-The script MUST:
-1. Scan for the device by its name prefix.
-2. Connect to the first found device.
-3. Find the correct service and characteristic.
-4. Construct the correct byte payload(s) to fulfill the user's request. Use the advanced macro structure if the request implies it (e.g., looping, targeting groups).
-5. Write the command bytes to the characteristic. For macros, this means sending a MACRO_EXECUTE (0x68) command followed by the sequence of instruction bytes. For macros that exceed the MTU (20 bytes), the script should split the payload into multiple writes.
-6. Disconnect gracefully.
-7. Include comments explaining the process, especially the byte payload construction.
-8. Handle potential errors using try/except blocks.
-
-# Example
-User Request: "Fade the light to red over 2 seconds, then buzz 3 times for 100ms each."
-This is a macro. The script should build a byte array starting with MACRO_EXECUTE (0x68).
-- LightTransition (0x22): mode=0, r=255, g=0, b=0, duration=2000ms (little-endian: 0xd0 0x07)
-- HapticBuzz (0x50): duration=100ms (little-endian: 0x64 0x00). For 3 loops, the script should add this command 3 times to the macro payload.
-
-Your final response must contain ONLY the raw Python code inside a single \`\`\`python ... \`\`\` code block. Do not add any conversational text or explanations outside of the code block.`;
-      
-      // FIX: Use ai.models.generateContent
-const response = await ai.models.generateContent({
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
-        contents: `Write a bleak python script for the ${deviceName} for this request: "${prompt}"`,
+        contents: `Generate a Python script for this task: "${prompt}". Use this protocol information as context:\n${protocolSummary}`,
         config: {
-          systemInstruction: systemInstruction,
+            systemInstruction: systemInstruction,
         },
       });
 
-      // Clean up the response to get only the code
-      // FIX: Use response.text to get the generated text
-const rawText = response.text;
-      const codeBlockRegex = /```python\n([\s\S]*?)```/;
-      const match = rawText.match(codeBlockRegex);
-      const script = match ? match[1] : rawText;
-
-      setGeneratedScript(script);
-      addLog('SUCCESS', 'Python script generated successfully.');
+      const script = response.text;
+      // Clean up the response, removing the markdown backticks
+      const cleanedScript = script.replace(/^```python\n|```$/g, '');
+      setGeneratedScript(cleanedScript);
+      addLog('SUCCESS', 'Python script generated.');
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      addLog('ERROR', `Failed to generate script: ${errorMessage}`);
-      setGeneratedScript(`# An error occurred while generating the script:\n# ${errorMessage}`);
+      setGeneratedScript(`# An error occurred: ${errorMessage}`);
+      addLog('ERROR', `Script generation failed: ${errorMessage}`);
     } finally {
-      setIsLoading(false);
+      setIsGenerating(false);
     }
-  }, [prompt, addLog, targetDevice]);
 
-  const handleCopy = useCallback(() => {
-    if (!generatedScript) return;
+  }, [prompt, addLog]);
+
+  const copyToClipboard = () => {
     navigator.clipboard.writeText(generatedScript).then(() => {
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-      addLog('INFO', 'Script copied to clipboard.');
-    }, (err) => {
-      addLog('ERROR', 'Failed to copy script to clipboard.');
+        setWasCopied(true);
+        setTimeout(() => setWasCopied(false), 2000);
     });
-  }, [generatedScript, addLog]);
+  };
 
   return (
-    <div className="space-y-6 flex flex-col h-full">
+    <div className="h-full flex flex-col space-y-4">
       <div>
-        <h3 className="text-xl font-semibold mb-2 flex items-center"><CodeIcon /> Python `bleak` Scripter</h3>
-        <p className="text-sm text-slate-400 mb-4">
-          Describe a custom effect or sequence, and Gemini will generate a Python script to control the wand. This is a powerful tool for testing undocumented commands and creating complex effects using loops, colors, and haptics.
-        </p>
-        <div className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Target Device</label>
-                <div className="flex rounded-lg bg-slate-900 p-1">
-                    <button 
-                        onClick={() => setTargetDevice('wand')} 
-                        className={`flex-1 py-2 text-sm rounded-md transition-colors ${targetDevice === 'wand' ? 'bg-indigo-600 text-white font-semibold' : 'hover:bg-slate-700'}`}>
-                        Wand
-                    </button>
-                    <button 
-                        onClick={() => setTargetDevice('box')} 
-                        className={`flex-1 py-2 text-sm rounded-md transition-colors ${targetDevice === 'box' ? 'bg-indigo-600 text-white font-semibold' : 'hover:bg-slate-700'}`}>
-                        Wand Box
-                    </button>
-                </div>
-            </div>
-            <div>
-              <label htmlFor="script-prompt" className="block text-sm font-medium text-slate-300">
-                  Action Description
-              </label>
-              <textarea
-                  id="script-prompt"
-                  rows={3}
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder='e.g., "Loop a blue pulse 5 times" or "Vibrate for 1 second then fade to red".'
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mt-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-              />
-            </div>
-            <button
-                onClick={handleGenerateScript}
-                disabled={isLoading}
-                className="w-full px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md disabled:bg-slate-500 disabled:cursor-wait transition-colors"
-            >
-                {isLoading ? 'Generating...' : 'Generate Script'}
-            </button>
-        </div>
+        <h3 className="text-xl font-semibold">Python Scripter (via Gemini)</h3>
+        <p className="text-sm text-slate-400">Describe a desired wand behavior, and Gemini will generate a Python script using the 'bleak' library to control it.</p>
+      </div>
+      
+      <div className="flex flex-col space-y-2">
+        <label htmlFor="prompt-input" className="font-semibold text-slate-300">Your Goal:</label>
+        <textarea
+          id="prompt-input"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="e.g., 'Make the wand vibrate for 1 second, then flash red, then turn off'"
+          rows={3}
+          className="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          onClick={generateScript}
+          disabled={isGenerating}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-wait flex items-center justify-center"
+        >
+          <CodeIcon />
+          {isGenerating ? 'Generating...' : 'Generate Script'}
+        </button>
       </div>
 
-      <div className="flex-grow flex flex-col">
+      <div className="flex-grow flex flex-col min-h-0">
         <div className="flex justify-between items-center mb-2">
-            <h4 className="text-lg font-semibold">Generated Script</h4>
-            <button 
-                onClick={handleCopy}
-                disabled={!generatedScript || isLoading}
-                className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50 transition-colors text-sm flex items-center gap-2"
+            <h4 className="font-semibold text-slate-300">Generated Python Script:</h4>
+            <button
+                onClick={copyToClipboard}
+                className="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-sm rounded flex items-center gap-2"
+                disabled={!generatedScript}
             >
-                {isCopied ? <><CheckIcon /> Copied!</> : <><ClipboardIcon /> Copy</>}
+                {wasCopied ? <CheckIcon /> : <ClipboardIcon />}
+                {wasCopied ? 'Copied!' : 'Copy'}
             </button>
         </div>
-        <div className="bg-slate-950 rounded-lg border border-slate-700 flex-grow p-1 overflow-auto">
-            <pre className="h-full">
-                <code className="text-sm text-slate-300 p-4 block h-full overflow-auto">
-                    {isLoading 
-                        ? <span className="text-slate-500 animate-pulse">Waiting for Gemini...</span>
-                        : generatedScript || <span className="text-slate-500">Your generated script will appear here.</span>
-                    }
-                </code>
-            </pre>
-        </div>
+        <pre className="flex-grow bg-slate-950 p-4 rounded-lg border border-slate-700 overflow-auto text-sm">
+          <code className="language-python">
+            {isGenerating ? 'Gemini is writing your script...' : (generatedScript || '# Your script will appear here...')}
+          </code>
+        </pre>
       </div>
     </div>
   );

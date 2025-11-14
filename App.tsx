@@ -1,13 +1,9 @@
-
-
-
-
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS } from './constants';
 // FIX: Added RawPacket to the import list from types.ts.
 import { WandTypes, RawPacket, ConnectionState } from './types';
-import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds } from './types';
+import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
 import Scripter from './Scripter';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -93,10 +89,8 @@ const BatteryIcon = ({ level }: { level: number | null }) => {
   );
 };
 const PlusCircleIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" /></svg>;
-// FIX: Replaced malformed SVG path data with a valid path. The original path had an invalid command sequence and could cause JSX parsing errors that manifest as arithmetic operation errors.
-const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8z m5 -1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>;
-// FIX: Corrected malformed SVG path data. The original path contained 'l-3-3' without a space which could be misparsed as an arithmetic operation by JSX.
-const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2V9a2 2 0 0 0 -2 -2h-3 m -1 4 l -3 3 m 0 0 l -3 -3 m 3 3V4" /></svg>;
+const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>;
+const SaveIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3m-1 4-3 3m0 0-3-3m3 3V4" /></svg>;
 const FolderOpenIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>;
 const ScanIcon = () => (
   <svg className="w-24 h-24 text-indigo-400 mx-auto mb-4" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -115,56 +109,49 @@ const ScanIcon = () => (
 );
 const ChartBarIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-        {/* FIX: Added spaces around negative numbers and between commands in SVG path to prevent JSX parsing issues. */}
-        <path fillRule="evenodd" d="M3 3a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1H4a1 1 0 0 1 -1 -1V3zm2 12a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1 v -5 a1 1 0 0 1 -1 -1H6a1 1 0 0 1 -1 1v5zm5 -8a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1 V7z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M3 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3zm2 12a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v-5a1 1 0 0 1-1-1H6a1 1 0 0 1-1 1v5zm5-8a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V7z" clipRule="evenodd" />
     </svg>
 );
 const CodeIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20 l 4 -16 m 4 4 l 4 4 -4 4 M 6 16 l -4 -4 4 -4" />
+        {/* FIX: Corrected malformed SVG path data which could cause parsing errors. */}
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
     </svg>
 );
 const SearchCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {/* FIX: Corrected malformed SVG path data. The original path contained missing spaces around negative numbers, which could be misparsed as an arithmetic operation by JSX. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21 l -6 -6 m 2 -5 a7 7 0 1 1 -14 0 7 7 0 0 1 14 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
     </svg>
 );
 const LinkIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {/* FIX: Corrected malformed SVG path data. The original path contained missing spaces around negative numbers, which could be misparsed as an arithmetic operation by JSX. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0 -5.656 0 l -4 4 a4 4 0 1 0 5.656 5.656 l 1.102 -1.101 m -.758 -4.899 a4 4 0 0 0 5.656 0 l 4 -4 a4 4 0 0 0 -5.656 -5.656 l -1.1 1.1" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1" />
     </svg>
 );
 const LinkBreakIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        {/* FIX: Corrected malformed SVG path data. The original path contained 'l4-4' and '-5.656-5.656' without spaces which could be misparsed as an arithmetic operation. */}
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0 -5.656 0 l -4 4 a4 4 0 1 0 5.656 5.656 l 1.102 -1.101 m -.758 -4.899 a4 4 0 0 0 5.656 0 l 4 -4 a4 4 0 0 0 -5.656 -5.656 l -1.1 1.1 M15 12 a 3 3 0 1 1 -6 0 a 3 3 0 0 1 6 0 z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
     </svg>
 );
 const DocumentSearchIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 21h7a2 2 0 0 0 2 -2V9.414a1 1 0 0 0 -.293 -.707l-5.414 -5.414A1 1 0 0 0 12.586 3H7a2 2 0 0 0 -2 2v11 m 0 5 l 4.879 -4.879 m 0 0 a3 3 0 1 0 4.243 -4.242 3 3 0 0 0 -4.243 4.242z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 21h7a2 2 0 0 0 2-2V9.414a1 1 0 0 0-.293-.707l-5.414-5.414A1 1 0 0 0 12.586 3H7a2 2 0 0 0-2 2v11m0 5 4.879-4.879m0 0a3 3 0 1 0 4.243-4.242 3 3 0 0 0-4.243 4.242Z" />
     </svg>
 );
-// New: Connection status icons, inspired by WandStatus$b.smali discovery
 const SpinnerIcon = () => (
   <svg className="animate-spin h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    {/* FIX: Added space around negative number in SVG path to prevent JSX parsing issues. */}
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 01 8 -8 V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l 3 -2.647z"></path>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
 );
 const ExclamationCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M18 10a8 8 0 1 1 -16 0 8 8 0 0 1 16 0zm-7 4a1 1 0 1 1 -2 0 1 1 0 0 1 2 0zm-1-9a1 1 0 0 0 -1 1v4a1 1 0 1 0 2 0V6a1 1 0 0 0 -1 -1z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0zM9 4a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm-1 9a1 1 0 0 0 1-1V6a1 1 0 1 0-2 0v6a1 1 0 0 0 1 1z" clipRule="evenodd" />
     </svg>
 );
 const CheckCircleIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-        {/* FIX: Added spaces around negative numbers in SVG path to prevent JSX parsing issues. */}
-        <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0 -16 8 8 0 0 0 0 16zm3.707 -9.293a1 1 0 0 0 -1.414 -1.414L9 10.586 7.707 9.293a1 1 0 0 0 -1.414 1.414l2 2a1 1 0 0 0 1.414 0l4 -4z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zm3.707-9.293a1 1 0 0 0-1.414-1.414L9 10.586 7.707 9.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4z" clipRule="evenodd" />
     </svg>
 );
 const SparklesIcon = () => (
@@ -176,8 +163,28 @@ const SparklesIcon = () => (
 
 
 // --- UI COMPONENTS ---
+interface TabButtonProps {
+  Icon: React.ElementType;
+  label: string;
+  onClick: () => void;
+  isActive: boolean;
+}
 
-// New: Tutorial Modal, inspired by TutorialActivity.smali
+const TabButton: React.FC<TabButtonProps> = ({ Icon, label, onClick, isActive }) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center p-3 rounded-lg text-left transition-colors ${
+      isActive
+        ? 'bg-indigo-600 text-white font-semibold shadow-md'
+        : 'hover:bg-slate-700'
+    }`}
+  >
+    <Icon />
+    <span>{label}</span>
+  </button>
+);
+
+
 interface TutorialModalProps {
   onFinish: () => void;
 }
@@ -254,6 +261,105 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish }) => {
   );
 };
 
+interface ModalProps {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => {
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in" 
+      onClick={handleOverlayClick}
+    >
+      <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl border border-slate-700 m-4 overflow-hidden" >
+        <div className="flex justify-between items-center p-4 bg-slate-900/50 border-b border-slate-700">
+          <h2 className="text-xl font-bold text-indigo-400">{title}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-700">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-6 max-h-[80vh] overflow-y-auto">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface BleExplorerProps {
+  onScan: () => void;
+  isExploring: boolean;
+  device: BluetoothDevice | null;
+  services: ExplorerService[];
+}
+
+const BleExplorer: React.FC<BleExplorerProps> = ({ onScan, isExploring, device, services }) => {
+  return (
+    <div className="h-full flex flex-col space-y-4">
+      <div>
+        <h3 className="text-xl font-semibold">BLE Service Explorer</h3>
+        <p className="text-sm text-slate-400">Scan for any nearby BLE device to inspect its services and characteristics.</p>
+      </div>
+      <div className="flex-shrink-0">
+        <button onClick={onScan} disabled={isExploring} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-wait flex items-center justify-center w-full">
+          {isExploring ? (
+            <>
+              <SpinnerIcon />
+              Scanning...
+            </>
+          ) : (
+            <>
+              <SearchCircleIcon />
+              Scan for Any BLE Device
+            </>
+          )}
+        </button>
+      </div>
+      <div className="flex-grow overflow-y-auto pr-2 -mr-2 bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+        {!device && !isExploring && <p className="text-slate-500 text-center">Click scan to begin.</p>}
+        {device && (
+          <div>
+            <h4 className="text-lg font-semibold text-indigo-400">{device.name || 'Unnamed Device'}</h4>
+            <p className="text-xs font-mono text-slate-500 mb-4">{device.id}</p>
+            <div className="space-y-4">
+              {services.length === 0 && <p className="text-slate-400">No services found for this device.</p>}
+              {services.map(service => (
+                <div key={service.uuid} className="bg-slate-800 p-3 rounded-lg">
+                  <h5 className="font-semibold text-green-400 font-mono text-sm">{service.uuid}</h5>
+                  <div className="pl-4 mt-2 space-y-1 border-l-2 border-slate-700">
+                    {service.characteristics.map(char => (
+                      <div key={char.uuid}>
+                        <p className="font-mono text-xs text-cyan-400">{char.uuid}</p>
+                        <div className="flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-400 mt-1">
+                          {char.properties.read && <span className="bg-slate-700 px-1.5 py-0.5 rounded-full">READ</span>}
+                          {char.properties.write && <span className="bg-slate-700 px-1.5 py-0.5 rounded-full">WRITE</span>}
+                          {char.properties.writeWithoutResponse && <span className="bg-slate-700 px-1.5 py-0.5 rounded-full">WRITE_NO_RESP</span>}
+                          {char.properties.notify && <span className="bg-slate-700 px-1.5 py-0.5 rounded-full">NOTIFY</span>}
+                          {char.properties.indicate && <span className="bg-slate-700 px-1.5 py-0.5 rounded-full">INDICATE</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 
 interface LogViewProps {
   logs: LogEntry[];
@@ -289,7 +395,6 @@ const LogView: React.FC<LogViewProps> = ({ logs }) => {
   );
 };
 
-// New: Status Badge component for improved connection state display
 interface StatusBadgeProps {
   state: ConnectionState;
 }
@@ -327,10 +432,248 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ state }) => {
   );
 };
 
+const VfxCommandView: React.FC<{ command: VfxCommand; onUpdate: (id: number, params: any) => void; onRemove: (id: number) => void; }> = ({ command, onUpdate, onRemove }) => {
+    const paramInputs = () => {
+        switch (command.type) {
+            case 'LightTransition':
+                return (
+                    <>
+                        <input type="color" value={command.params.hex_color || '#ffffff'} onChange={e => onUpdate(command.id, { hex_color: e.target.value })} className="bg-slate-700 rounded h-8 w-10 cursor-pointer border-2 border-slate-600" />
+                        <input type="number" placeholder="Mode" value={command.params.mode ?? 0} onChange={e => onUpdate(command.id, { mode: parseInt(e.target.value) || 0 })} className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" />
+                        <input type="number" placeholder="ms" value={command.params.transition_ms ?? 1000} onChange={e => onUpdate(command.id, { transition_ms: parseInt(e.target.value) || 0 })} className="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" />
+                    </>
+                );
+            case 'HapticBuzz':
+            case 'MacroDelay':
+                return <input type="number" placeholder="ms" value={command.params.duration_ms ?? 500} onChange={e => onUpdate(command.id, { duration_ms: parseInt(e.target.value) || 0 })} className="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" />;
+            case 'LoopEnd':
+                return <input type="number" placeholder="Loops" value={command.params.loops ?? 2} onChange={e => onUpdate(command.id, { loops: parseInt(e.target.value) || 0 })} className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm" />;
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-2 p-2 bg-slate-900 rounded-md border border-slate-700 animate-fade-in">
+            <span className="font-semibold text-sm text-cyan-400 flex-shrink-0 w-28">{command.type}</span>
+            <div className="flex-grow flex items-center gap-2">
+                {paramInputs()}
+            </div>
+            <button onClick={() => onRemove(command.id)} className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-full">
+                <TrashIcon />
+            </button>
+        </div>
+    );
+};
+
+const VfxEditor: React.FC<{
+  sequence: VfxCommand[];
+  addCommand: (type: VfxCommandType) => void;
+  updateCommand: (id: number, params: any) => void;
+  removeCommand: (id: number) => void;
+  sendSequence: () => void;
+  saveSequence: () => void;
+  isSaved: boolean;
+  isConnected: boolean;
+}> = ({ sequence, addCommand, updateCommand, removeCommand, sendSequence, saveSequence, isSaved, isConnected }) => {
+    return (
+        <div className="flex flex-col h-full bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h3 className="text-xl font-semibold mb-2">VFX Macro Editor</h3>
+            <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-2 mb-4">
+                {sequence.length > 0 ? (
+                    sequence.map(cmd => <VfxCommandView key={cmd.id} command={cmd} onUpdate={updateCommand} onRemove={removeCommand} />)
+                ) : (
+                    <p className="text-center text-slate-500 pt-8">Add a command to start building a sequence.</p>
+                )}
+            </div>
+            <div className="flex-shrink-0">
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                    <button onClick={() => addCommand('LightTransition')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Light</button>
+                    <button onClick={() => addCommand('HapticBuzz')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Haptic</button>
+                    <button onClick={() => addCommand('MacroDelay')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Delay</button>
+                    <button onClick={() => addCommand('LightClear')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Clear</button>
+                    <button onClick={() => addCommand('LoopStart')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Loop Start</button>
+                    <button onClick={() => addCommand('LoopEnd')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Loop End</button>
+                </div>
+                <div className="flex gap-2">
+                    <button onClick={saveSequence} className={`flex-1 flex items-center justify-center px-4 py-2 rounded font-semibold text-sm ${isSaved ? 'bg-slate-600 text-slate-400' : 'bg-green-600 hover:bg-green-500'}`}>
+                        <SaveIcon /> {isSaved ? 'Saved' : 'Save'}
+                    </button>
+                    <button onClick={sendSequence} disabled={!isConnected} className="flex-1 flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed text-sm">
+                        <MagicWandIcon /> Send to Wand
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SpellDetailsCard: React.FC<{
+  spellDetails: SpellDetails | null;
+  isLoading: boolean;
+  error: string | null;
+  onCastOnWand: (details: SpellDetails | null) => void;
+  onCastOnBox: (details: SpellDetails | null) => void;
+  isWandConnected: boolean;
+  isBoxConnected: boolean;
+}> = ({ spellDetails, isLoading, error, onCastOnWand, onCastOnBox, isWandConnected, isBoxConnected }) => {
+    if (isLoading) {
+        return <div className="text-center flex flex-col items-center justify-center h-full"><SpinnerIcon /> <p className="mt-2">Consulting the magical archives...</p></div>;
+    }
+    if (error) {
+        return <div className="text-center flex flex-col items-center justify-center h-full text-red-400"><ExclamationCircleIcon /> <p className="mt-2">{error}</p></div>;
+    }
+    if (!spellDetails) {
+        return <div className="text-center flex flex-col items-center justify-center h-full text-slate-500"><p>Cast a spell with your wand to see its details here.</p></div>;
+    }
+    
+    const spellUsesIcons: Record<string, React.ReactNode> = {
+      utility: <PlusCircleIcon />,
+      combat: <MagicWandIcon />,
+      charm: <SparklesIcon />,
+      default: <SparklesIcon />,
+    };
+
+    return (
+        <div className="p-4 rounded-lg border h-full flex flex-col" style={{ borderColor: spellDetails.spell_background_color || '#4A5568', backgroundColor: `${spellDetails.spell_background_color}1A` }}>
+            <div className="flex justify-between items-start mb-3">
+                <div>
+                    <h4 className="text-2xl font-bold" style={{ color: spellDetails.spell_background_color || '#E2E8F0' }}>{spellDetails.spell_name.replace(/_/g, ' ')}</h4>
+                    <p className="font-mono text-sm text-slate-400">{spellDetails.incantation_name}</p>
+                </div>
+                <div className="text-xs bg-slate-700/50 px-2 py-1 rounded-full">{spellDetails.spell_type}</div>
+            </div>
+            <p className="text-slate-300 text-sm mb-4">{spellDetails.description}</p>
+            <div className="mb-4">
+                <h5 className="font-semibold text-slate-400 text-sm mb-2">Difficulty</h5>
+                <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className={`w-full h-2 rounded-full ${i < spellDetails.difficulty ? 'bg-indigo-500' : 'bg-slate-700'}`}></div>
+                    ))}
+                </div>
+            </div>
+            <div className="mb-4">
+                <h5 className="font-semibold text-slate-400 text-sm mb-2">Common Uses</h5>
+                <ul className="space-y-2">
+                    {spellDetails.spell_uses.map(use => (
+                        <li key={use.id} className="flex items-center text-sm bg-slate-800/50 p-2 rounded">
+                            <div className="text-indigo-400">{spellUsesIcons[use.icon] || spellUsesIcons.default}</div>
+                            <span className="ml-2">{use.name}</span>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+            <div className="mt-auto pt-4 border-t border-slate-700/50 space-y-2">
+                 <button onClick={() => onCastOnWand(spellDetails)} disabled={!isWandConnected} className="w-full flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed text-sm">
+                    <MagicWandIcon /> Cast on Wand
+                </button>
+                 <button onClick={() => onCastOnBox(spellDetails)} disabled={!isBoxConnected} className="w-full flex items-center justify-center px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed text-sm">
+                    <CubeIcon /> Cast on Box
+                </button>
+            </div>
+        </div>
+    );
+};
+
+
+const ControlHub: React.FC<{
+  lastSpell: string;
+  gestureState: GestureState;
+  clientSideGestureDetected: boolean;
+  spellDetails: SpellDetails | null;
+  isFetchingSpellDetails: boolean;
+  spellDetailsError: string | null;
+  vfxSequence: VfxCommand[];
+  addVfxCommand: (type: VfxCommandType) => void;
+  updateVfxCommand: (id: number, params: any) => void;
+  removeVfxCommand: (id: number) => void;
+  sendVfxSequence: () => void;
+  saveVfxSequence: () => void;
+  isSequenceSaved: boolean;
+  wandConnectionState: ConnectionState;
+  boxConnectionState: ConnectionState;
+  liveEvent: LiveEvent | null;
+  onCastOnWand: (details: SpellDetails | null) => void;
+  onCastOnBox: (details: SpellDetails | null) => void;
+  castingHistory: CastingHistoryEntry[];
+}> = ({
+  lastSpell, gestureState, clientSideGestureDetected, spellDetails, isFetchingSpellDetails, spellDetailsError,
+  vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved,
+  wandConnectionState, boxConnectionState, liveEvent, onCastOnWand, onCastOnBox, castingHistory
+}) => {
+    const gestureStatus = () => {
+        let text = 'Ready to Cast';
+        let color = 'text-slate-400';
+        if (gestureState === 'Casting') {
+            text = 'Casting...';
+            color = 'text-yellow-400 animate-pulse';
+        } else if (gestureState === 'Processing') {
+            text = 'Processing...';
+            color = 'text-blue-400 animate-pulse';
+        } else if (clientSideGestureDetected) {
+            text = 'Motion Detected!';
+            color = 'text-green-400';
+        }
+        return <span className={color}>{text}</span>;
+    };
+
+    return (
+        <div className="h-full grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+            {/* Left Column */}
+            <div className="flex flex-col space-y-4 overflow-hidden">
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                    <h3 className="text-xl font-semibold mb-2">Wand Status</h3>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="font-semibold text-slate-400">Last Spell:</span>
+                            <span className="font-mono text-indigo-300">{lastSpell || 'None'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="font-semibold text-slate-400">Gesture State:</span>
+                            <span className="font-mono">{gestureStatus()}</span>
+                        </div>
+                        <div className="h-6 flex items-center justify-center">
+                            {liveEvent && (
+                                <div className="text-xs font-semibold bg-slate-700 px-3 py-1 rounded-full animate-fade-in">{liveEvent.message}</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="flex-grow min-h-0">
+                    <SpellDetailsCard 
+                        spellDetails={spellDetails}
+                        isLoading={isFetchingSpellDetails}
+                        error={spellDetailsError}
+                        onCastOnWand={onCastOnWand}
+                        onCastOnBox={onCastOnBox}
+                        isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
+                        isBoxConnected={boxConnectionState === ConnectionState.CONNECTED}
+                    />
+                </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="overflow-hidden">
+                <VfxEditor 
+                    sequence={vfxSequence}
+                    addCommand={addVfxCommand}
+                    updateCommand={updateVfxCommand}
+                    removeCommand={removeVfxCommand}
+                    sendSequence={sendVfxSequence}
+                    saveSequence={saveVfxSequence}
+                    isSaved={isSequenceSaved}
+                    isConnected={wandConnectionState === ConnectionState.CONNECTED}
+                />
+            </div>
+        </div>
+    );
+};
+
 
 const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
+const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
 
 
 // --- IMU Data Parsing ---
@@ -395,6 +738,431 @@ type LiveEvent = {
   type: 'info' | 'processing' | 'success';
 } | null;
 
+interface SpellBookProps {
+  spellBook: Spell[];
+  discoveredSpells: Set<string>;
+  discoveredCount: number;
+  totalCount: number;
+  spellFilter: string;
+  setSpellFilter: (filter: string) => void;
+  castingHistory: CastingHistoryEntry[];
+}
+
+const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, discoveredCount, totalCount, spellFilter, setSpellFilter, castingHistory }) => {
+    const castCounts = React.useMemo(() => {
+        // FIX: Explicitly type the accumulator in `reduce` to prevent potential type inference issues.
+        return castingHistory.reduce<Record<string, number>>((acc, cast) => {
+            acc[cast.name] = (acc[cast.name] ?? 0) + 1;
+            return acc;
+        }, {});
+    }, [castingHistory]);
+    
+    const filteredAndSortedSpells = React.useMemo(() => {
+        return [...spellBook]
+            .filter(spell => spell.name.toLowerCase().replace(/_/g, ' ').includes(spellFilter.toLowerCase()))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [spellBook, spellFilter]);
+
+    const discoveryPercentage = totalCount > 0 ? Math.round((discoveredCount / totalCount) * 100) : 0;
+
+    return (
+        <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 h-full flex flex-col">
+            <h2 className="text-lg font-semibold mb-2">Spell Book</h2>
+            <div className="mb-4">
+                <div className="flex justify-between items-center text-sm text-slate-400 mb-1">
+                    <span>Discovery Progress</span>
+                    <span>{discoveredCount} / {totalCount}</span>
+                </div>
+                <div className="w-full bg-slate-700 rounded-full h-2.5">
+                    <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style={{ width: `${discoveryPercentage}%` }}></div>
+                </div>
+            </div>
+            <input
+                type="text"
+                value={spellFilter}
+                onChange={(e) => setSpellFilter(e.target.value)}
+                placeholder="Filter discovered spells..."
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mb-4 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            <div className="flex-grow overflow-y-auto -mr-2 pr-2">
+                <ul className="space-y-2">
+                    {filteredAndSortedSpells.map(spell => (
+                        <li key={spell.name} className="flex justify-between items-center bg-slate-700/50 p-2 rounded-md animate-fade-in">
+                            <span className="text-slate-300">{spell.name.replace(/_/g, ' ')}</span>
+                            {castCounts[spell.name] > 0 && (
+                                <span className="text-xs bg-indigo-500/50 text-indigo-300 font-mono px-2 py-0.5 rounded-full">
+                                    x{castCounts[spell.name]}
+                                </span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+};
+
+interface SpellCompendiumProps {
+  spellBook: Spell[];
+  castingHistory: CastingHistoryEntry[];
+  onSelectSpell: (spellName: string) => void;
+  onUnlockAll: () => void;
+}
+
+const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, castingHistory, onSelectSpell, onUnlockAll }) => {
+    const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name)), [spellBook]);
+
+    const castCounts = React.useMemo(() => {
+        // FIX: Explicitly type the accumulator in `reduce` to prevent potential type inference issues.
+        return castingHistory.reduce<Record<string, number>>((acc, cast) => {
+            acc[cast.name] = (acc[cast.name] ?? 0) + 1;
+            return acc;
+        }, {});
+    }, [castingHistory]);
+
+    // FIX: Memoize the sorted spell list to improve performance and avoid potential toolchain errors.
+    const sortedSpellList = React.useMemo(() => [...SPELL_LIST].sort(), []);
+
+    return (
+        <div className="h-full flex flex-col space-y-4">
+            <div className="flex-shrink-0 flex justify-between items-center">
+                <div>
+                    <h3 className="text-xl font-semibold">Spell Compendium</h3>
+                    <p className="text-sm text-slate-400">A catalog of all known spells. Cast them to discover them, or click to view details.</p>
+                </div>
+                <button
+                    onClick={onUnlockAll}
+                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-slate-900 rounded font-semibold text-sm flex items-center gap-2"
+                >
+                    <SparklesIcon />
+                    Unlock All Spells (Dev)
+                </button>
+            </div>
+            <div className="flex-grow overflow-y-auto pr-2 -mr-2 bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {/* FIX: Avoid mutating the constant SPELL_LIST by creating a copy before sorting. */}
+                    {sortedSpellList.map(spellName => {
+                        const isDiscovered = discoveredSpells.has(spellName);
+                        const count = castCounts[spellName] || 0;
+                        return (
+                            <button
+                                key={spellName}
+                                onClick={() => isDiscovered && onSelectSpell(spellName)}
+                                disabled={!isDiscovered}
+                                className={`p-4 rounded-lg text-center transition-all duration-200 h-28 flex flex-col justify-between ${
+                                    isDiscovered
+                                    ? 'bg-slate-800 hover:bg-slate-700 hover:scale-105 border border-indigo-500/50 cursor-pointer shadow-lg'
+                                    : 'bg-slate-800/50 text-slate-500 border border-slate-700'
+                                }`}
+                            >
+                                <p className={`font-semibold text-sm ${isDiscovered ? 'text-indigo-300' : ''}`}>
+                                    {spellName.replace(/_/g, ' ')}
+                                </p>
+                                {isDiscovered ? (
+                                    count > 0 ? (
+                                        <div className="mt-2 text-xs font-mono bg-slate-700 inline-block px-2 py-0.5 rounded-full text-slate-300 self-center">
+                                            Casted x{count}
+                                        </div>
+                                    ) : (
+                                        <div className="mt-2 text-xs font-mono text-green-400/80 self-center">
+                                            Discovered
+                                        </div>
+                                    )
+                                ) : (
+                                    <div className="mt-2 text-xs font-mono text-slate-600 self-center">
+                                        Undiscovered
+                                    </div>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const Diagnostics: React.FC<any> = ({
+  detectedOpCodes, rawPacketLog, bleEventLog, isImuStreaming, toggleImuStream, handleImuCalibrate,
+  latestImuData, buttonState, smaliInput, setSmaliInput, analyzeSmaliWithGemini, isAnalyzingSmali,
+  smaliAnalysis, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled,
+  gestureThreshold, setGestureThreshold, clientSideGestureDetected, buttonThresholds, handleReadButtonThresholds,
+  wandConnectionState, queueCommand
+}) => {
+    const sortedOpCodes = React.useMemo(() => Array.from(detectedOpCodes).sort((a, b) => a - b), [detectedOpCodes]);
+    const isConnected = wandConnectionState === ConnectionState.CONNECTED;
+
+    return (
+        <div className="h-full flex flex-col space-y-4">
+            <h3 className="text-xl font-semibold">Diagnostics &amp; Raw Data</h3>
+            <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-hidden">
+                
+                {/* Left Column */}
+                <div className="flex flex-col space-y-4 overflow-hidden">
+                    {/* IMU & Buttons Panel */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         {/* IMU Panel */}
+                        <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                            <h4 className="text-lg font-semibold mb-3">IMU &amp; Sensors</h4>
+                             <div className="flex space-x-2 mb-3">
+                                <button onClick={toggleImuStream} disabled={!isConnected} className="flex-1 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 rounded font-semibold disabled:bg-slate-500">{isImuStreaming ? 'Stop Stream' : 'Start Stream'}</button>
+                                <button onClick={handleImuCalibrate} disabled={!isConnected} className="flex-1 px-3 py-2 text-sm bg-yellow-600 hover:bg-yellow-500 rounded font-semibold disabled:bg-slate-500">Calibrate</button>
+                            </div>
+                             <div className="font-mono text-xs space-y-1 text-slate-400">
+                                {latestImuData ? latestImuData.slice(-1).map(d => (
+                                    <div key={d.chunk_index}>
+                                        <p>Acc: {d.acceleration.x.toFixed(2)}, {d.acceleration.y.toFixed(2)}, {d.acceleration.z.toFixed(2)}</p>
+                                        <p>Gyr: {d.gyroscope.x.toFixed(2)}, {d.gyroscope.y.toFixed(2)}, {d.gyroscope.z.toFixed(2)}</p>
+                                    </div>
+                                )) : <p>IMU stream is off.</p>}
+                            </div>
+                        </div>
+
+                        {/* Button Panel */}
+                        <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                           <div className="flex justify-between items-center mb-2">
+                             <h4 className="text-lg font-semibold">Grip &amp; Thresholds</h4>
+                             <button onClick={handleReadButtonThresholds} disabled={!isConnected} className="px-2 py-1 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Read</button>
+                           </div>
+                            <div className="flex justify-around items-center h-16">
+                                {buttonState.map((pressed, i) => (
+                                    <div key={i} className="flex flex-col items-center">
+                                        <div className={`w-8 h-8 rounded-full border-2 ${pressed ? 'bg-indigo-500 border-indigo-300' : 'bg-slate-700 border-slate-600'}`}></div>
+                                        <span className="text-xs mt-1 text-slate-400">B{i+1}</span>
+                                        <span className="text-xs font-mono text-slate-500">
+                                            {buttonThresholds[i].min !== null ? `${buttonThresholds[i].min}-${buttonThresholds[i].max}` : 'N/A'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Gesture Detection Panel */}
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                         <div className="relative flex items-start">
+                            <div className="flex h-5 items-center">
+                                <input id="gesture-toggle" type="checkbox" checked={isClientSideGestureDetectionEnabled} onChange={e => setIsClientSideGestureDetectionEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                            </div>
+                            <div className="ml-3 text-sm">
+                                <label htmlFor="gesture-toggle" className="font-medium text-slate-300">Client-Side Gesture Detection</label>
+                                <p className="text-slate-400">Detect casting motion in the browser based on acceleration magnitude.</p>
+                            </div>
+                        </div>
+                        {isClientSideGestureDetectionEnabled && (
+                            <div className="mt-3">
+                                <label htmlFor="gesture-threshold" className="block text-sm font-medium text-slate-400">Threshold: {gestureThreshold.toFixed(1)} G</label>
+                                <input type="range" id="gesture-threshold" min="0.5" max="5" step="0.1" value={gestureThreshold} onChange={e => setGestureThreshold(parseFloat(e.target.value))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
+                            </div>
+                        )}
+                         {clientSideGestureDetected && <p className="text-green-400 text-sm mt-2 animate-pulse">Motion Detected!</p>}
+                    </div>
+                     {/* Command Test Panel */}
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                         <h4 className="text-lg font-semibold mb-3">Direct Command Tests</h4>
+                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                             <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.HAPTIC_VIBRATE, 0x58, 0x02]))} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Buzz (600ms)</button>
+                             <button onClick={() => queueCommand(WBDLPayloads.LIGHT_CLEAR_ALL_CMD)} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Clear Lights</button>
+                             <button onClick={() => queueCommand(WBDLPayloads.MACRO_READY_TO_CAST_CMD)} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Ready FX</button>
+                             <button onClick={() => queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD)} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Req Firmware</button>
+                         </div>
+                    </div>
+                    {/* Smali Analysis Panel */}
+                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col">
+                         <h4 className="text-lg font-semibold mb-2">Smali Analyzer (via Gemini)</h4>
+                         <textarea value={smaliInput} onChange={e => setSmaliInput(e.target.value)} placeholder="Paste smali code here..." rows={4} className="w-full bg-slate-950 border border-slate-600 rounded-lg p-2 text-xs font-mono"></textarea>
+                         <button onClick={analyzeSmaliWithGemini} disabled={isAnalyzingSmali} className="mt-2 w-full px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded disabled:bg-slate-500">{isAnalyzingSmali ? 'Analyzing...' : 'Analyze'}</button>
+                         <div className="mt-2 p-2 bg-slate-950 rounded border border-slate-600 flex-grow overflow-y-auto text-sm prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: smaliAnalysis || '<p class="text-slate-500">Analysis results will appear here.</p>' }}></div>
+                    </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col overflow-hidden">
+                    <h4 className="text-lg font-semibold mb-2">Protocol Data Logs</h4>
+                    <div className="flex-grow overflow-y-auto">
+                        <h5 className="font-semibold text-slate-400 mt-2">Detected Incoming Opcodes:</h5>
+                        <div className="flex flex-wrap gap-1 text-xs font-mono mt-1 mb-2">
+                            {sortedOpCodes.length > 0 ? sortedOpCodes.map(code => <span key={code} className="bg-slate-700 px-2 py-0.5 rounded-full">0x{code.toString(16).padStart(2, '0')}</span>) : <span className="text-slate-500">None yet</span>}
+                        </div>
+                         <h5 className="font-semibold text-slate-400 mt-2">Raw Packet Log (Incoming):</h5>
+                         <div className="h-32 overflow-y-scroll bg-slate-950 rounded p-2 font-mono text-xs border border-slate-700">
+                             {rawPacketLog.map(p => <div key={p.id}><span className="text-slate-500">{p.timestamp}</span> <span className="text-purple-400">{p.hexData}</span></div>)}
+                         </div>
+                         <h5 className="font-semibold text-slate-400 mt-2">BLE Event Log:</h5>
+                         <div className="h-32 overflow-y-scroll bg-slate-950 rounded p-2 font-mono text-xs border border-slate-700">
+                             {bleEventLog.map(e => <div key={e.id}><span className="text-slate-500">{e.timestamp}</span> <span className="text-green-400">[{e.event}]</span> <span className="text-slate-300">{e.detail}</span></div>)}
+                         </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+interface DeviceManagerProps {
+  wandConnectionState: ConnectionState;
+  boxConnectionState: ConnectionState;
+  wandDetails: WandDevice | null;
+  boxDetails: WandDevice | null;
+  wandBatteryLevel: number | null;
+  boxBatteryLevel: number | null;
+  onConnectWand: () => void;
+  onConnectBox: () => void;
+  rawWandProductInfo: string | null;
+  rawBoxProductInfo: string | null;
+  isTvBroadcastEnabled: boolean;
+  setIsTvBroadcastEnabled: (enabled: boolean) => void;
+  userHouse: House;
+  setUserHouse: (house: House) => void;
+  userPatronus: string;
+  setUserPatronus: (patronus: string) => void;
+  isHueEnabled: boolean;
+  setIsHueEnabled: (enabled: boolean) => void;
+  hueBridgeIp: string;
+  setHueBridgeIp: (ip: string) => void;
+  hueUsername: string;
+  setHueUsername: (user: string) => void;
+  hueLightId: string;
+  setHueLightId: (id: string) => void;
+  saveHueSettings: () => void;
+  negotiatedMtu: number;
+  commandDelay_ms: number;
+  setCommandDelay_ms: (delay: number) => void;
+  onResetTutorial: () => void;
+  onSendBoxTestMacro: () => void;
+  onRequestBoxAddress: () => void;
+}
+
+const DeviceCard: React.FC<{
+  title: string,
+  icon: React.ReactNode,
+  connectionState: ConnectionState,
+  onConnect: () => void,
+  details: WandDevice | null,
+  batteryLevel: number | null,
+  rawProductInfo: string | null
+}> = ({ title, icon, connectionState, onConnect, details, batteryLevel, rawProductInfo }) => (
+  <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+    <div className="flex justify-between items-start mb-3">
+      <div className="flex items-center">
+        {icon}
+        <h3 className="text-xl font-semibold">{title}</h3>
+      </div>
+      <StatusBadge state={connectionState} />
+    </div>
+    {connectionState === ConnectionState.DISCONNECTED ? (
+      <button onClick={onConnect} className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold">Connect</button>
+    ) : (
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="font-semibold text-slate-400">Name:</span>
+          <span className="font-mono text-slate-300">{details?.bleName}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="font-semibold text-slate-400">Address:</span>
+          <span className="font-mono text-slate-300">{details?.address}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="font-semibold text-slate-400">Battery:</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-slate-300">{batteryLevel !== null ? `${batteryLevel}%` : 'N/A'}</span>
+            <BatteryIcon level={batteryLevel} />
+          </div>
+        </div>
+        <div className="flex justify-between">
+            <span className="font-semibold text-slate-400">Firmware:</span>
+            <span className="font-mono text-slate-300">{details?.firmware || '...'}</span>
+        </div>
+        <div className="flex justify-between">
+            <span className="font-semibold text-slate-400">Wand Type:</span>
+            <span className="font-mono text-slate-300">{details?.wandType || '...'}</span>
+        </div>
+        <div className="pt-2">
+            <h4 className="text-xs font-semibold text-slate-400 mb-1">Raw Product Info Packets</h4>
+            <pre className="bg-slate-950 p-2 rounded text-xs font-mono max-h-24 overflow-y-auto border border-slate-600">{rawProductInfo || 'No product info received yet.'}</pre>
+        </div>
+      </div>
+    )}
+  </div>
+);
+
+const DeviceManager: React.FC<DeviceManagerProps> = ({
+  wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel,
+  onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled,
+  setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled,
+  setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId,
+  setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial,
+  onSendBoxTestMacro, onRequestBoxAddress
+}) => (
+  <div className="h-full flex flex-col space-y-4 overflow-y-auto">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <DeviceCard 
+        title="Magic Wand"
+        icon={<MagicWandIcon />}
+        connectionState={wandConnectionState}
+        onConnect={onConnectWand}
+        details={wandDetails}
+        batteryLevel={wandBatteryLevel}
+        rawProductInfo={rawWandProductInfo}
+      />
+      <DeviceCard 
+        title="Wand Box"
+        icon={<CubeIcon />}
+        connectionState={boxConnectionState}
+        onConnect={onConnectBox}
+        details={boxDetails}
+        batteryLevel={boxBatteryLevel}
+        rawProductInfo={rawBoxProductInfo}
+      />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+        <h3 className="text-xl font-semibold mb-3">Integrations</h3>
+         <div className="space-y-4">
+            {/* TV Broadcast */}
+            <div className="relative flex items-start">
+                <div className="flex h-5 items-center"><input id="tv-broadcast" type="checkbox" checked={isTvBroadcastEnabled} onChange={e => setIsTvBroadcastEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></div>
+                <div className="ml-3 text-sm"><label htmlFor="tv-broadcast" className="font-medium text-slate-300">Smart TV Broadcast</label><p className="text-slate-400">Simulate sending UDP spell packets to a smart TV.</p></div>
+            </div>
+             {isTvBroadcastEnabled && <div className="pl-5 space-y-2">
+                <div><label className="text-xs font-semibold text-slate-400">House</label><select value={userHouse} onChange={e => setUserHouse(e.target.value as House)} className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1 mt-1 text-sm"><option value="GRYFFINDOR">Gryffindor</option><option value="HUFFLEPUFF">Hufflepuff</option><option value="RAVENCLAW">Ravenclaw</option><option value="SLYTHERIN">Slytherin</option></select></div>
+                <div><label className="text-xs font-semibold text-slate-400">Patronus</label><input type="text" value={userPatronus} onChange={e => setUserPatronus(e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1 mt-1 text-sm" /></div>
+            </div>}
+             {/* Hue Integration */}
+            <div className="relative flex items-start pt-4 border-t border-slate-700">
+                <div className="flex h-5 items-center"><input id="hue-enable" type="checkbox" checked={isHueEnabled} onChange={e => setIsHueEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" /></div>
+                <div className="ml-3 text-sm"><label htmlFor="hue-enable" className="font-medium text-slate-300">Philips Hue Lights</label><p className="text-slate-400">Simulate spell effects on your smart lights.</p></div>
+            </div>
+             {isHueEnabled && <div className="pl-5 space-y-2">
+                <div><label className="text-xs font-semibold text-slate-400">Bridge IP</label><input type="text" value={hueBridgeIp} onChange={e => setHueBridgeIp(e.target.value)} placeholder="192.168.1.100" className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1 mt-1 text-sm" /></div>
+                <div><label className="text-xs font-semibold text-slate-400">Username</label><input type="text" value={hueUsername} onChange={e => setHueUsername(e.target.value)} placeholder="Press button on bridge..." className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1 mt-1 text-sm" /></div>
+                <div><label className="text-xs font-semibold text-slate-400">Light ID</label><input type="text" value={hueLightId} onChange={e => setHueLightId(e.target.value)} placeholder="1" className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1 mt-1 text-sm" /></div>
+                <button onClick={saveHueSettings} className="w-full px-3 py-1 bg-slate-600 hover:bg-slate-500 text-xs rounded">Save Hue Settings</button>
+            </div>}
+         </div>
+      </div>
+      <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 space-y-4">
+        <h3 className="text-xl font-semibold">Protocol &amp; App Settings</h3>
+        <div>
+            <label htmlFor="mtu-info" className="block text-sm font-medium text-slate-300">Negotiated MTU Size</label>
+            <p className="text-slate-400 text-xs">Maximum packet size for commands. Default is 20.</p>
+            <input id="mtu-info" type="text" value={`${negotiatedMtu} bytes`} readOnly className="w-full bg-slate-800 border-slate-600 rounded-md px-3 py-2 mt-1 font-mono text-sm" />
+        </div>
+        <div>
+            <label htmlFor="cmd-delay" className="block text-sm font-medium text-slate-300">Command Delay</label>
+            <p className="text-slate-400 text-xs">Delay between queued write commands ({commandDelay_ms}ms).</p>
+            <input id="cmd-delay" type="range" min="0" max="200" step="5" value={commandDelay_ms} onChange={e => setCommandDelay_ms(parseInt(e.target.value, 10))} className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer mt-1" />
+        </div>
+        <div className="pt-4 border-t border-slate-700 space-y-2">
+            <button onClick={onRequestBoxAddress} className="w-full text-sm px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold">Request Box Address</button>
+            <button onClick={onSendBoxTestMacro} className="w-full text-sm px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold">Send Box Test Macro</button>
+            <button onClick={onResetTutorial} className="w-full text-sm px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold">Reset Tutorial</button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 
 // --- MAIN APP ---
 export default function App() {
@@ -417,7 +1185,7 @@ export default function App() {
   const [buttonState, setButtonState] = React.useState<[boolean, boolean, boolean, boolean]>([false, false, false, false]);
   
   // General State
-  const [lastSpell, setLastSpell] = React.useState<string>('');
+  const [lastSpell, setLastSpell] = React.useState<{ name: string; isLive: boolean } | null>(null);
   const [spellDetails, setSpellDetails] = React.useState<SpellDetails | null>(null);
   const [isFetchingSpellDetails, setIsFetchingSpellDetails] = React.useState(false);
   const [spellDetailsError, setSpellDetailsError] = React.useState<string | null>(null);
@@ -431,6 +1199,7 @@ export default function App() {
   const [detectedOpCodes, setDetectedOpCodes] = React.useState<Set<number>>(new Set());
   const [rawPacketLog, setRawPacketLog] = React.useState<RawPacket[]>([]);
   const [spellBook, setSpellBook] = React.useState<Spell[]>([]);
+  const [castingHistory, setCastingHistory] = React.useState<CastingHistoryEntry[]>([]);
   const [spellFilter, setSpellFilter] = React.useState('');
   
   const [isImuStreaming, setIsImuStreaming] = React.useState(false);
@@ -494,12 +1263,13 @@ export default function App() {
   const bleEventCounter = React.useRef(0);
   const commandIdCounter = React.useRef(0);
   const rawPacketLogCounter = React.useRef(0);
+  const castingHistoryCounter = React.useRef(0);
   const keepAliveInterval = React.useRef<number | null>(null);
   const liveEventTimeout = React.useRef<number | null>(null);
   const commandCharacteristic = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const boxCommandCharacteristic = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const isInitialMountSpells = React.useRef(true);
-  // Fix: Memoize the set of discovered spells with toUpperCase for case-insensitive checking.
+  const isInitialMountHistory = React.useRef(true);
   const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name.toUpperCase())), [spellBook]);
 
   // New: Ref to store macro indices, based on smali reverse engineering
@@ -538,7 +1308,7 @@ export default function App() {
         }
       }
     } catch (error) {
-      addLog('ERROR', `Failed to load sequence from storage: ${error}`);
+      addLog('ERROR', `Failed to load sequence from storage: ${String(error)}`);
       localStorage.removeItem(LOCAL_STORAGE_KEY_VFX);
     }
 
@@ -552,10 +1322,27 @@ export default function App() {
           addLog('INFO', 'Loaded spell book from storage.');
         }
       }
-    // Fix: Corrected syntax for catch block.
     } catch (error) {
-      addLog('ERROR', `Failed to load spell book: ${error}`);
+      addLog('ERROR', `Failed to load spell book: ${String(error)}`);
       localStorage.removeItem(LOCAL_STORAGE_KEY_SPELLBOOK);
+    }
+
+    // Load Casting History
+    try {
+        const savedHistoryJSON = localStorage.getItem(LOCAL_STORAGE_KEY_CASTING_HISTORY);
+        if (savedHistoryJSON) {
+            const savedHistory: CastingHistoryEntry[] = JSON.parse(savedHistoryJSON);
+            if (Array.isArray(savedHistory)) {
+                setCastingHistory(savedHistory);
+                if (savedHistory.length > 0) {
+                    castingHistoryCounter.current = Math.max(...savedHistory.map(h => h.id)) + 1;
+                }
+                addLog('INFO', 'Loaded casting history from storage.');
+            }
+        }
+    } catch (error) {
+        addLog('ERROR', `Failed to load casting history: ${String(error)}`);
+        localStorage.removeItem(LOCAL_STORAGE_KEY_CASTING_HISTORY);
     }
 
     // Load TV Broadcast settings
@@ -599,7 +1386,7 @@ export default function App() {
         setShowTutorial(true);
       }
     } catch (error) {
-      addLog('ERROR', `Could not read tutorial status from storage: ${error}`);
+      addLog('ERROR', `Could not read tutorial status from storage: ${String(error)}`);
       setShowTutorial(true); // Show tutorial if storage fails
     }
   }, [addLog]);
@@ -614,9 +1401,22 @@ export default function App() {
     try {
         localStorage.setItem(LOCAL_STORAGE_KEY_SPELLBOOK, JSON.stringify(spellBook));
     } catch (error) {
-        addLog('ERROR', `Failed to save spell book: ${error}`);
+        addLog('ERROR', `Failed to save spell book: ${String(error)}`);
     }
   }, [spellBook, addLog]);
+
+  // New: Effect to auto-save Casting History when it changes
+  React.useEffect(() => {
+      if (isInitialMountHistory.current) {
+          isInitialMountHistory.current = false;
+          return;
+      }
+      try {
+          localStorage.setItem(LOCAL_STORAGE_KEY_CASTING_HISTORY, JSON.stringify(castingHistory));
+      } catch (error) {
+          addLog('ERROR', `Failed to save casting history: ${String(error)}`);
+      }
+  }, [castingHistory, addLog]);
 
   // Effect to save TV Broadcast settings
   React.useEffect(() => {
@@ -625,7 +1425,7 @@ export default function App() {
         localStorage.setItem('magicWandUserHouse', userHouse);
         localStorage.setItem('magicWandUserPatronus', userPatronus);
     } catch (error) {
-        addLog('ERROR', `Failed to save TV Broadcast settings: ${error}`);
+        addLog('ERROR', `Failed to save TV Broadcast settings: ${String(error)}`);
     }
   }, [isTvBroadcastEnabled, userHouse, userPatronus, addLog]);
   
@@ -638,7 +1438,7 @@ export default function App() {
         localStorage.setItem('magicWandHueLightId', hueLightId);
         addLog('SUCCESS', 'Hue settings saved.');
     } catch (error) {
-        addLog('ERROR', `Failed to save Hue settings: ${error}`);
+        addLog('ERROR', `Failed to save Hue settings: ${String(error)}`);
     }
   }, [isHueEnabled, hueBridgeIp, hueUsername, hueLightId, addLog]);
 
@@ -658,6 +1458,28 @@ export default function App() {
     }
   }, [wandConnectionState, boxConnectionState, isScannerOpen, deviceToScan]);
 
+  const macroSchema = {
+    type: Type.ARRAY,
+    description: "A list of command groups. Each group is a list of command objects to be executed in sequence for the device's VFX.",
+    items: {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                command: {
+                    type: Type.STRING,
+                    description: "Command name. Must be one of: 'LightTransition', 'HapticBuzz', 'MacroDelay', 'LightClear'."
+                },
+                color: { type: Type.STRING, description: "Hex color (#RRGGBB) for 'LightTransition'." },
+                duration: { type: Type.INTEGER, description: "Duration in milliseconds for 'LightTransition', 'HapticBuzz', and 'MacroDelay'." },
+                group: { type: Type.INTEGER, description: "LED group to target for 'LightTransition'. Usually 0." },
+                loops: { type: Type.INTEGER, description: "Number of times to repeat this command. Defaults to 1." }
+            },
+            required: ["command"]
+        }
+    }
+  };
+
 
   const fetchSpellDetails = React.useCallback(async (spellName: string) => {
     if (!spellName) return;
@@ -668,8 +1490,7 @@ export default function App() {
     addLog('INFO', `Fetching details for spell: ${spellName}...`);
 
     try {
-      // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+      const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
       
       const responseSchema = {
           type: Type.OBJECT,
@@ -692,15 +1513,16 @@ const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
                       },
                       required: ["id", "name", "icon"]
                   }
-              }
+              },
+              config_wand: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
+              config_wandbox: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
           },
-          required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses"]
+          required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "config_wand", "config_wandbox"]
       };
 
-      const systemInstruction = `You are a magical archivist providing data about spells from a wizarding world. For a given spell name, you must return a single, valid JSON object with details about that spell. The JSON object must conform to the provided schema. The 'spell_name' in the response should be the same as the input spell name, formatted in uppercase.`;
+      const systemInstruction = `You are a magical archivist providing data about spells from a wizarding world. For a given spell name, you must return a single, valid JSON object with details about that spell, conforming to the provided schema. The 'spell_name' in the response should be the same as the input spell name, formatted in uppercase. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
 
-      // FIX: Use ai.models.generateContent
-const response = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `Provide the details for the spell: "${spellName}".`,
         config: {
@@ -710,8 +1532,7 @@ const response = await ai.models.generateContent({
         },
       });
 
-      // FIX: Use response.text to get the generated text
-const jsonText = response.text.trim();
+      const jsonText = response.text;
       const details = JSON.parse(jsonText) as SpellDetails;
       setSpellDetails(details);
       addLog('SUCCESS', `Successfully fetched details for ${spellName}.`);
@@ -726,7 +1547,13 @@ const jsonText = response.text.trim();
   }, [addLog]);
 
   React.useEffect(() => {
-    fetchSpellDetails(lastSpell);
+    if (lastSpell?.name) {
+      fetchSpellDetails(lastSpell.name);
+    } else {
+      setSpellDetails(null);
+      setSpellDetailsError(null);
+      setIsFetchingSpellDetails(false);
+    }
   }, [lastSpell, fetchSpellDetails]);
 
 
@@ -760,7 +1587,6 @@ const jsonText = response.text.trim();
     }
 
     let payload: object | null = null;
-// FIX: Use backticks for template literal to correctly generate the random color string.
     const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
 
     switch (spellName) {
@@ -1021,7 +1847,7 @@ const jsonText = response.text.trim();
           updater(prev => prev ? { ...prev, ...partialDetails } : prev);
 
       } catch (e) {
-          addLog('ERROR', `Failed to parse Product Info packet for ${forDevice} (type 0x${infoType.toString(16)}): ${e}`);
+          addLog('ERROR', `Failed to parse Product Info packet for ${forDevice} (type 0x${infoType.toString(16)}): ${String(e)}`);
       }
   }, [addLog]);
 
@@ -1175,7 +2001,8 @@ const jsonText = response.text.trim();
           liveEventTimeout.current = window.setTimeout(() => setLiveEvent(null), 4000); // Clear after 4s
 
           addLog('SUCCESS', `SPELL DETECTED: *** ${finalSpellName} *** (Raw: "${cleanedSpellName}", Header: ${headerHex})`);
-          setLastSpell(finalSpellName);
+          
+          setLastSpell({ name: finalSpellName, isLive: true });
           setGestureState('Idle');
           
           sendTvBroadcast(finalSpellName);
@@ -1191,9 +2018,17 @@ const jsonText = response.text.trim();
             return prevBook;
           });
 
+          // Add to casting history
+          const newHistoryEntry: CastingHistoryEntry = {
+            id: castingHistoryCounter.current++,
+            name: finalSpellName,
+            timestamp: getTimestamp(),
+          };
+          setCastingHistory(prev => [newHistoryEntry, ...prev].slice(0, 100)); // Prepend and cap at 100
+
 
         } catch (e) {
-          addLog('ERROR', `Error decoding spell packet. Header: ${headerHex}, Packet: ${hexData}, Error: ${e}`);
+          addLog('ERROR', `Error decoding spell packet. Header: ${headerHex}, Packet: ${hexData}, Error: ${String(e)}`);
           setGestureState('Idle');
         }
       } else {
@@ -1365,7 +2200,6 @@ const jsonText = response.text.trim();
   const createInitialDevice = (bleDevice: BluetoothDevice, type: WandDeviceType): WandDevice => ({
     device: bleDevice,
     deviceType: type,
-// Fix: Use the more robust `bleDevice.id` which is a required property on BluetoothDevice.
     address: bleDevice.id.toUpperCase(), // Standardize to uppercase for comparisons
     bleName: bleDevice.name ?? 'Unknown',
     wandType: 'UNKNOWN',
@@ -1535,14 +2369,24 @@ const jsonText = response.text.trim();
         addLog('WARNING', 'Box characteristic does not support notifications.');
       }
       
+      // New: Subscribe to battery notifications as per WandBoxHelper.smali
+      if (batteryChar.properties.notify) {
+        addLog('INFO', 'Subscribing to Box battery notifications...');
+        await batteryChar.startNotifications();
+        batteryChar.addEventListener('characteristicvaluechanged', handleBoxBatteryLevel);
+        addLog('SUCCESS', 'Notifications enabled for Box Battery.');
+      } else {
+        addLog('WARNING', 'Box battery characteristic does not support notifications.');
+      }
+      
       if (batteryChar.properties.read) {
-        addLog('INFO', 'Reading Box battery level...');
+        addLog('INFO', 'Reading initial Box battery level...');
         const initialBattery = await batteryChar.readValue();
         const level = initialBattery.getUint8(0);
-        setBoxBatteryLevel(level);
+        setBoxBatteryLevel(level); // Set initial level
         addLog('SUCCESS', `Initial Box Battery Level: ${level}%`);
       } else {
-        addLog('WARNING', 'Box battery characteristic does not support read.');
+        addLog('INFO', 'Cannot read initial Box battery level (property not supported). Waiting for notification.');
       }
 
       setBoxConnectionState(ConnectionState.CONNECTED);
@@ -1560,7 +2404,7 @@ const jsonText = response.text.trim();
       setBoxConnectionState(ConnectionState.ERROR);
       setBoxDetails(null);
     }
-  }, [addLog, handleBoxDisconnect, parseBoxData, addBleEvent, queueBoxCommand]);
+  }, [addLog, handleBoxDisconnect, parseBoxData, addBleEvent, queueBoxCommand, handleBoxBatteryLevel]);
 
   const addVfxCommand = (type: VfxCommandType) => {
     let params: VfxCommand['params'] = {};
@@ -1598,7 +2442,7 @@ const jsonText = response.text.trim();
       setIsSequenceSaved(true);
       addLog('SUCCESS', 'VFX Sequence saved to local storage.');
     } catch (error) {
-      addLog('ERROR', `Failed to save sequence: ${error}`);
+      addLog('ERROR', `Failed to save sequence: ${String(error)}`);
     }
   };
   
@@ -1620,13 +2464,11 @@ const jsonText = response.text.trim();
           break;
         case 'HapticBuzz': {
           const duration = cmd.params.duration_ms ?? 100;
-          // FIX: Corrected byte order to little-endian based on conclusive smali analysis.
           payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
           break;
         }
         case 'MacroDelay': {
           const duration = cmd.params.duration_ms ?? 100;
-          // FIX: Corrected byte order to little-endian based on conclusive smali analysis.
           payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
           break;
         }
@@ -1645,7 +2487,6 @@ const jsonText = response.text.trim();
           const g = parseInt(hex.substring(3, 5), 16);
           const b = parseInt(hex.substring(5, 7), 16);
           
-          // FIX: Corrected duration byte order to little-endian based on conclusive smali analysis.
           payload.push(
             WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
             mode,
@@ -1704,7 +2545,9 @@ const jsonText = response.text.trim();
       addLog('ERROR', 'Wand not connected.');
       return;
     }
-    addLog('INFO', 'Sending IMU calibration command...');
+    addLog('INFO', 'Sending IMU calibration sequence...');
+    // New: Sequence from WandHelper.smali analysis. Send unlock, then calibrate.
+    queueCommand(WBDLPayloads.FACTORY_UNLOCK_CMD);
     queueCommand(WBDLPayloads.IMU_CALIBRATE_CMD);
   }, [wandConnectionState, addLog, queueCommand]);
   
@@ -1762,8 +2605,7 @@ const jsonText = response.text.trim();
     addLog('INFO', 'Analyzing smali with Gemini...');
 
     try {
-        // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
         const systemInstruction = `You are an expert reverse engineer specializing in Android smali code, specifically for Bluetooth Low Energy (BLE) protocols. Analyze the provided smali code snippet from a BLE-related application. Your analysis should focus on identifying key information relevant to the BLE protocol.
 
 Your response should be a concise summary in markdown format.
@@ -1777,8 +2619,7 @@ Focus on identifying and explaining:
 
 Be precise and base your conclusions directly on the provided code.`;
 
-        // FIX: Use ai.models.generateContent
-const response = await ai.models.generateContent({
+        const response = await ai.models.generateContent({
             model: 'gemini-2.5-pro',
             contents: `Analyze this smali code:\n\n\`\`\`smali\n${smaliInput}\n\`\`\``,
             config: {
@@ -1786,8 +2627,7 @@ const response = await ai.models.generateContent({
             },
         });
         
-        // FIX: Use response.text to get the generated text
-setSmaliAnalysis(response.text);
+        setSmaliAnalysis(response.text);
         addLog('SUCCESS', 'Smali analysis complete.');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1930,20 +2770,20 @@ setSmaliAnalysis(response.text);
         addLog('ERROR', 'Wand not connected.');
         return;
     }
-    if (!spellDetails || !spellDetails.macros_payoff || spellDetails.macros_payoff.length === 0) {
-        addLog('WARNING', `No macro found for spell ${spellDetails?.spell_name}.`);
+    if (!spellDetails || !spellDetails.config_wand?.macros_payoff || spellDetails.config_wand.macros_payoff.length === 0) {
+        addLog('WARNING', `No wand macro found for spell ${spellDetails?.spell_name}.`);
         return;
     }
 
     const deviceType = 'WAND';
 
     const currentIndex = macroIndexes.current[deviceType] ?? -1;
-    const nextIndex = (currentIndex + 1) % spellDetails.macros_payoff.length;
+    const nextIndex = (currentIndex + 1) % spellDetails.config_wand.macros_payoff.length;
     macroIndexes.current[deviceType] = nextIndex;
 
-    const macroVariation = spellDetails.macros_payoff[nextIndex];
+    const macroVariation = spellDetails.config_wand.macros_payoff[nextIndex];
 
-    addLog('INFO', `Casting '${spellDetails.spell_name}' on Wand. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
+    addLog('INFO', `Casting '${spellDetails.spell_name}' on Wand. Executing macro variation ${nextIndex + 1}/${spellDetails.config_wand.macros_payoff.length}.`);
 
     sendMacroSequence(macroVariation, 'wand');
   }, [addLog, wandConnectionState, sendMacroSequence]);
@@ -1953,23 +2793,36 @@ setSmaliAnalysis(response.text);
         addLog('ERROR', 'Wand Box not connected.');
         return;
     }
-    if (!spellDetails || !spellDetails.macros_payoff || spellDetails.macros_payoff.length === 0) {
-        addLog('WARNING', `No macro found for spell ${spellDetails?.spell_name}.`);
+     if (!spellDetails || !spellDetails.config_wandbox?.macros_payoff || spellDetails.config_wandbox.macros_payoff.length === 0) {
+        addLog('WARNING', `No box macro found for spell ${spellDetails?.spell_name}.`);
         return;
     }
 
     const deviceType = 'BOX';
 
     const currentIndex = macroIndexes.current[deviceType] ?? -1;
-    const nextIndex = (currentIndex + 1) % spellDetails.macros_payoff.length;
+    const nextIndex = (currentIndex + 1) % spellDetails.config_wandbox.macros_payoff.length;
     macroIndexes.current[deviceType] = nextIndex;
 
-    const macroVariation = spellDetails.macros_payoff[nextIndex];
+    const macroVariation = spellDetails.config_wandbox.macros_payoff[nextIndex];
 
-    addLog('INFO', `Activating '${spellDetails.spell_name}' on Box. Executing macro variation ${nextIndex + 1}/${spellDetails.macros_payoff.length}.`);
+    addLog('INFO', `Activating '${spellDetails.spell_name}' on Box. Executing macro variation ${nextIndex + 1}/${spellDetails.config_wandbox.macros_payoff.length}.`);
 
     sendMacroSequence(macroVariation, 'box');
   }, [addLog, boxConnectionState, sendMacroSequence]);
+
+  React.useEffect(() => {
+    if (
+      spellDetails &&
+      lastSpell?.isLive &&
+      boxConnectionState === ConnectionState.CONNECTED &&
+      spellDetails.spell_name.toUpperCase().replace(/_/g, '') === lastSpell.name.toUpperCase().replace(/_/g, '')
+    ) {
+      addLog('INFO', `Wand cast detected. Triggering automatic reaction on Wand Box for "${spellDetails.spell_name}".`);
+      castSpellOnBox(spellDetails);
+      setLastSpell(prev => (prev ? { ...prev, isLive: false } : null));
+    }
+  }, [spellDetails, lastSpell, boxConnectionState, castSpellOnBox, addLog]);
 
 
   const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
@@ -1979,8 +2832,7 @@ setSmaliAnalysis(response.text);
     setCompendiumSpellDetails(null);
     addLog('INFO', `Compendium: Fetching details for ${spellName}...`);
     try {
-       // FIX: Use new GoogleGenAI({apiKey: process.env.API_KEY})
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+       const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
        
        const responseSchema = {
            type: Type.OBJECT,
@@ -1998,32 +2850,15 @@ const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
                         icon: { type: Type.STRING }
                     }, required: ["id", "name", "icon"]
                 }},
-                macros_payoff: { 
-                    type: Type.ARRAY, 
-                    description: "A list of command groups. Each group is a list of command objects to be executed in sequence for the wand's VFX.",
-                    items: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                command: { type: Type.STRING, description: "Command name, e.g., 'LightTransition', 'HapticBuzz', 'MacroDelay'."},
-                                color: { type: Type.STRING, description: "Hex color for light commands."},
-                                duration: { type: Type.INTEGER, description: "Duration in milliseconds."},
-                                group: { type: Type.INTEGER, description: "LED group to target."},
-                                loops: { type: Type.INTEGER, description: "Number of times to repeat."}
-                            },
-                            required: ["command"]
-                        }
-                    }
-                }
+                config_wand: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
+                config_wandbox: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
            },
-           required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "macros_payoff"]
+           required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "config_wand", "config_wandbox"]
        };
 
-      const systemInstruction = `You are a magical archivist. Based on the provided spell name, return a complete JSON object representing the spell's data, conforming to the schema. Invent a plausible 'macros_payoff' section that describes a simple but representative VFX sequence for the spell using the available commands.`;
+      const systemInstruction = `You are a magical archivist. Based on the provided spell name, return a complete JSON object representing the spell's data, conforming to the schema. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
 
-      // FIX: Use ai.models.generateContent
-const response = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: "gemini-2.5-pro",
         contents: `Provide the full spell data object for: "${spellName}".`,
         config: {
@@ -2033,8 +2868,7 @@ const response = await ai.models.generateContent({
         },
       });
 
-      // FIX: Use response.text to get the generated text
-const jsonText = response.text.trim();
+      const jsonText = response.text;
       const details = JSON.parse(jsonText) as SpellDetails;
       setCompendiumSpellDetails(details);
       addLog('SUCCESS', `Compendium: Successfully fetched details for ${spellName}.`);
@@ -2060,7 +2894,7 @@ const jsonText = response.text.trim();
       setShowTutorial(false);
       addLog('INFO', 'Tutorial completed. Welcome!');
     } catch (error) {
-      addLog('ERROR', `Failed to save tutorial status: ${error}`);
+      addLog('ERROR', `Failed to save tutorial status: ${String(error)}`);
       setShowTutorial(false); // Hide it anyway
     }
   }, [addLog]);
@@ -2071,7 +2905,7 @@ const jsonText = response.text.trim();
       setShowTutorial(true);
       addLog('INFO', 'Tutorial has been reset and will show again.');
     } catch (error) {
-      addLog('ERROR', `Failed to reset tutorial status: ${error}`);
+      addLog('ERROR', `Failed to reset tutorial status: ${String(error)}`);
     }
   }, [addLog]);
   
@@ -2116,7 +2950,7 @@ const jsonText = response.text.trim();
   const renderTab = () => {
     switch (activeTab) {
       case 'control_hub': return <ControlHub 
-        lastSpell={lastSpell} 
+        lastSpell={lastSpell?.name || ''} 
         gestureState={gestureState} 
         clientSideGestureDetected={clientSideGestureDetected}
         spellDetails={spellDetails}
@@ -2130,7 +2964,11 @@ const jsonText = response.text.trim();
         saveVfxSequence={saveVfxSequence}
         isSequenceSaved={isSequenceSaved}
         wandConnectionState={wandConnectionState}
+        boxConnectionState={boxConnectionState}
         liveEvent={liveEvent}
+        castingHistory={castingHistory}
+        onCastOnWand={castSpellOnWand}
+        onCastOnBox={castSpellOnBox}
       />;
       case 'device_manager': return <DeviceManager 
           wandConnectionState={wandConnectionState}
@@ -2191,6 +3029,7 @@ const jsonText = response.text.trim();
       />;
       case 'compendium': return <SpellCompendium
           spellBook={spellBook}
+          castingHistory={castingHistory}
           onSelectSpell={(spell) => {
               setSelectedCompendiumSpell(spell);
               setIsCompendiumModalOpen(true);
@@ -2262,7 +3101,6 @@ const jsonText = response.text.trim();
             <div className="flex-shrink-0 bg-slate-800 p-4 rounded-lg border border-slate-700">
                 <h2 className="text-lg font-semibold mb-3">Navigation</h2>
                 <div className="flex flex-col gap-2">
-                    {/* FIX: Added 'key' prop to TabButton component to fix React warning and potential rendering issues. */}
                     <TabButton key="control_hub" Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
                     <TabButton key="device_manager" Icon={CubeIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
                     <TabButton key="diagnostics" Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
@@ -2279,6 +3117,7 @@ const jsonText = response.text.trim();
                     totalCount={SPELL_LIST.length}
                     spellFilter={spellFilter}
                     setSpellFilter={setSpellFilter}
+                    castingHistory={castingHistory}
                  />
             </div>
         </div>
@@ -2287,1169 +3126,13 @@ const jsonText = response.text.trim();
           {renderTab()}
         </div>
         
-        <div className="flex-shrink-0 md:w-1/4 flex flex-col min-h-0">
-          <LogView logs={logs} />
+        <div className="flex-shrink-0 md:w-1/3 flex flex-col gap-4">
+          <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 flex-grow">
+            <h2 className="text-lg font-semibold mb-2">Logs</h2>
+            <LogView logs={logs} />
+          </div>
         </div>
-
       </main>
     </div>
   );
 }
-
-// --- TABS & SUB-COMPONENTS ---
-interface TabButtonProps {
-// FIX: Changed from React.ComponentType to React.ElementType.
-// This is a more general type for components passed as props and can resolve
-// subtle type-checking issues that sometimes lead to cryptic parser errors.
-  Icon: React.ElementType;
-  label: string;
-  onClick: () => void;
-  isActive: boolean;
-}
-
-const TabButton: React.FC<TabButtonProps> = ({ Icon, label, onClick, isActive }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center px-4 py-2 rounded-lg text-left transition-colors ${
-      isActive 
-        ? 'bg-indigo-600 text-white font-semibold shadow-md' 
-        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-    }`}
-  >
-    <Icon /> {label}
-  </button>
-);
-
-
-interface ControlHubProps {
-  lastSpell: string;
-  gestureState: GestureState;
-  clientSideGestureDetected: boolean;
-  spellDetails: SpellDetails | null;
-  isFetchingSpellDetails: boolean;
-  spellDetailsError: string | null;
-  vfxSequence: VfxCommand[];
-  addVfxCommand: (type: VfxCommandType) => void;
-  updateVfxCommand: (id: number, params: VfxCommand['params']) => void;
-  removeVfxCommand: (id: number) => void;
-  sendVfxSequence: () => void;
-  saveVfxSequence: () => void;
-  isSequenceSaved: boolean;
-  wandConnectionState: ConnectionState;
-  liveEvent: LiveEvent;
-}
-
-const ControlHub: React.FC<ControlHubProps> = ({ lastSpell, gestureState, clientSideGestureDetected, spellDetails, isFetchingSpellDetails, spellDetailsError, vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved, wandConnectionState, liveEvent }) => {
-    return (
-        <div className="flex flex-col h-full space-y-4">
-            <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                    <h3 className="text-xl font-semibold mb-2">Wand Status</h3>
-                    <div className="flex items-center text-lg">
-                        <span className="font-bold mr-2">Last Spell:</span>
-                        <span className="text-indigo-400 font-mono">{lastSpell || 'N/A'}</span>
-                    </div>
-                     <div className="flex items-center text-lg mb-3">
-                        <span className="font-bold mr-2">Gesture:</span>
-                        <span className={`px-2 py-1 rounded text-sm ${
-                            gestureState === 'Idle' ? 'bg-slate-600' :
-                            gestureState === 'Casting' ? 'bg-blue-500 animate-pulse' : 'bg-purple-500'
-                        }`}>{gestureState}</span>
-                        {gestureState === 'Idle' && clientSideGestureDetected && (
-                            <span className="ml-2 px-2 py-1 rounded text-xs bg-green-500/30 text-green-300 animate-pulse">
-                                Client Motion Detected
-                            </span>
-                        )}
-                    </div>
-                    {/* New: Live Event Indicator based on smali analysis */}
-                    <div className="mt-2 pt-3 border-t border-slate-700">
-                        <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Live Event</h4>
-                        {liveEvent ? (
-                            <div className={`p-2 rounded text-sm font-mono flex items-center animate-fade-in ${
-                                liveEvent.type === 'info' ? 'bg-blue-900/50 text-blue-300' :
-                                liveEvent.type === 'processing' ? 'bg-purple-900/50 text-purple-300' :
-                                'bg-green-900/50 text-green-300'
-                            }`}>
-                                <span className="animate-ping h-2 w-2 rounded-full bg-current opacity-75 mr-3"></span>
-                                <span>{liveEvent.message}</span>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-slate-500">Idle</p>
-                        )}
-                    </div>
-                </div>
-                <SpellDetailsCard spellDetails={spellDetails} isLoading={isFetchingSpellDetails} error={spellDetailsError} />
-            </div>
-            <div className="flex-grow min-h-0">
-                <VfxEditor 
-                    sequence={vfxSequence}
-                    addCommand={addVfxCommand}
-                    updateCommand={updateVfxCommand}
-                    removeCommand={removeVfxCommand}
-                    sendSequence={sendVfxSequence}
-                    saveSequence={saveVfxSequence}
-                    isSaved={isSequenceSaved}
-                    isConnected={wandConnectionState === ConnectionState.CONNECTED}
-                />
-            </div>
-        </div>
-    );
-};
-
-const LumosGestureIcon = () => (
-    <svg viewBox="0 0 100 120" className="w-24 h-30 mx-auto">
-      {/* Main gesture path */}
-      <path
-        d="M 10 110 L 50 10 L 90 110"
-        stroke="white"
-        strokeWidth="5"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Start circle */}
-      <circle cx="10" cy="110" r="6" fill="white" />
-      
-      {/* Left arrow. Positioned at (30,60), rotated to point down-left. */}
-      <g transform="translate(30, 60) rotate(135)">
-        <path d="M -8 0 L 0 8 L 8 0" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </g>
-  
-      {/* Right arrow. Positioned at (70,60), rotated to point down-right. */}
-      <g transform="translate(70, 60) rotate(45)">
-        <path d="M -8 0 L 0 8 L 8 0" stroke="white" strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-      </g>
-    </svg>
-);
-
-interface SpellDetailsCardProps {
-    spellDetails: SpellDetails | null;
-    isLoading: boolean;
-    error: string | null;
-    onCastOnWand?: (spellDetails: SpellDetails) => void;
-    onCastOnBox?: (spellDetails: SpellDetails) => void;
-    isWandConnected?: boolean;
-    isBoxConnected?: boolean;
-}
-
-const SpellDetailsCard: React.FC<SpellDetailsCardProps> = ({ spellDetails, isLoading, error, onCastOnWand, onCastOnBox, isWandConnected, isBoxConnected }) => {
-    const [selectedMacroIndex, setSelectedMacroIndex] = React.useState(0);
-
-    React.useEffect(() => {
-        // Reset to the first macro variation when the spell details change
-        setSelectedMacroIndex(0);
-    }, [spellDetails]);
-    
-    if (isLoading) {
-        return (
-            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 animate-pulse">
-                <div className="h-6 bg-slate-700 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-slate-700 rounded w-1/2"></div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="bg-red-900/50 p-4 rounded-lg border border-red-700">
-                <h3 className="text-xl font-semibold mb-2 text-red-300">Error</h3>
-                <p className="text-red-400">{error}</p>
-            </div>
-        );
-    }
-    
-    if (!spellDetails) {
-        return (
-            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                <h3 className="text-xl font-semibold mb-2">Spell Details</h3>
-                <p className="text-slate-400">Cast a spell to see its details here.</p>
-            </div>
-        );
-    }
-    
-    // Dynamically set border color
-    const cardStyle = {
-      borderColor: spellDetails.spell_background_color || '#475569', // Default slate-600
-      borderWidth: '1px',
-    };
-    
-    const formatMacroParams = (cmd: MacroCommand) => {
-        const params = [];
-        if (cmd.color) params.push(`color: ${cmd.color}`);
-        if (cmd.duration) params.push(`duration: ${cmd.duration}ms`);
-        if (cmd.group) params.push(`group: ${cmd.group}`);
-        if (cmd.loops) params.push(`loops: ${cmd.loops}`);
-        return params.join(', ');
-    };
-
-    return (
-        <div className="bg-slate-900/50 p-4 rounded-lg" style={cardStyle}>
-            <h3 className="text-xl font-semibold" style={{ color: spellDetails.spell_background_color }}>{spellDetails.spell_name}</h3>
-            <p className="text-sm italic text-slate-400 mb-2">"{spellDetails.incantation_name}" - {spellDetails.spell_type}</p>
-            <p className="text-slate-300 text-sm mb-3">{spellDetails.description}</p>
-            <div className="flex items-center justify-between text-xs mb-3">
-                 <div className="flex gap-2">
-                    {spellDetails.spell_uses.map(use => (
-                        <span key={use.id} className="bg-slate-700 px-2 py-1 rounded-full">{use.icon}</span>
-                    ))}
-                </div>
-                <div className="flex items-center" title={`Difficulty: ${spellDetails.difficulty}/5`}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <span key={i} className={`h-2 w-2 rounded-full mx-0.5 ${i < spellDetails.difficulty ? 'bg-yellow-400' : 'bg-slate-600'}`}></span>
-                    ))}
-                </div>
-            </div>
-
-            {spellDetails.spell_name.toUpperCase() === 'LUMOS' && (
-                <div className="my-3">
-                    <h4 className="text-sm font-semibold text-slate-400 text-center mb-2">Spell Gesture</h4>
-                    <div className="bg-slate-950 p-2 rounded-lg border border-slate-700">
-                        <LumosGestureIcon />
-                    </div>
-                </div>
-            )}
-
-            {spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
-                <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-slate-400">VFX Macro</h4>
-                    {spellDetails.macros_payoff.length > 1 && (
-                        <div className="flex gap-1 bg-slate-800 p-1 rounded-md">
-                            {spellDetails.macros_payoff.map((_, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => setSelectedMacroIndex(index)}
-                                    className={`flex-1 text-xs px-2 py-1 rounded ${selectedMacroIndex === index ? 'bg-indigo-600 text-white' : 'bg-slate-700 hover:bg-slate-600'}`}
-                                >
-                                    Var {index + 1}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                     <div className="space-y-1 bg-slate-950 p-2 rounded-md max-h-24 overflow-y-auto">
-                        {spellDetails.macros_payoff[selectedMacroIndex]?.map((cmd, cmdIndex) => (
-                            <div key={cmdIndex} className="text-xs font-mono flex justify-between">
-                                <span className="text-cyan-400">{cmd.command}</span>
-                                <span className="text-slate-400">{formatMacroParams(cmd)}</span>
-                            </div>
-                        )) || <p className="text-xs text-slate-500">No commands in this variation.</p>}
-                    </div>
-                </div>
-            )}
-
-            {(onCastOnWand || onCastOnBox) && spellDetails.macros_payoff && spellDetails.macros_payoff.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-slate-600 flex flex-col sm:flex-row gap-2">
-                    {onCastOnWand && 
-                        <button 
-                            onClick={() => onCastOnWand(spellDetails)}
-                            disabled={!isWandConnected}
-                            className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
-                            title={!isWandConnected ? 'Connect wand to cast spell' : 'Execute spell VFX on wand'}
-                        >
-                            Cast on Wand
-                        </button>
-                    }
-                    {onCastOnBox &&
-                        <button 
-                            onClick={() => onCastOnBox(spellDetails)}
-                            disabled={!isBoxConnected}
-                            className="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed"
-                            title={!isBoxConnected ? 'Connect wand box to activate' : 'Execute spell VFX on box'}
-                        >
-                            Activate on Box
-                        </button>
-                    }
-                </div>
-            )}
-        </div>
-    );
-};
-
-
-interface VfxEditorProps {
-  sequence: VfxCommand[];
-  addCommand: (type: VfxCommandType) => void;
-  updateCommand: (id: number, params: VfxCommand['params']) => void;
-  removeCommand: (id: number) => void;
-  sendSequence: () => void;
-  saveSequence: () => void;
-  isSaved: boolean;
-  isConnected: boolean;
-}
-
-const VfxEditor: React.FC<VfxEditorProps> = ({ sequence, addCommand, updateCommand, removeCommand, sendSequence, saveSequence, isSaved, isConnected }) => {
-  return (
-    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 h-full flex flex-col">
-      <h3 className="text-xl font-semibold mb-2">VFX Macro Editor</h3>
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <button onClick={() => addCommand('LightTransition')} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded text-sm">Add Light</button>
-        <button onClick={() => addCommand('HapticBuzz')} className="px-3 py-1 bg-yellow-600 hover:bg-yellow-500 rounded text-sm">Add Haptic</button>
-        <button onClick={() => addCommand('MacroDelay')} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-sm">Add Delay</button>
-        <button onClick={() => addCommand('LightClear')} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm">Add Clear</button>
-        <div className="border-l border-slate-600 mx-2"></div>
-        <button onClick={() => addCommand('LoopStart')} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-sm">Add Loop Start</button>
-        <button onClick={() => addCommand('LoopEnd')} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-sm">Add Loop End</button>
-      </div>
-      <div className="flex-grow overflow-y-auto pr-2 space-y-2">
-        {sequence.length === 0 && <p className="text-slate-500 text-center py-8">Add a command to start building a sequence.</p>}
-        {(() => {
-            let indentLevel = 0;
-            return sequence.map((cmd, index) => {
-                let currentIndent = indentLevel;
-                if (cmd.type === 'LoopEnd' && indentLevel > 0) {
-                    currentIndent = indentLevel - 1; // De-indent the 'end' command itself
-                }
-                
-                const component = (
-                    <VfxCommandEditor 
-                        key={cmd.id} 
-                        command={cmd} 
-                        onUpdate={updateCommand} 
-                        onRemove={removeCommand} 
-                        index={index + 1} 
-                        indent={currentIndent}
-                    />
-                );
-
-                if (cmd.type === 'LoopStart') {
-                    indentLevel++;
-                }
-                if (cmd.type === 'LoopEnd' && indentLevel > 0) {
-                    indentLevel--;
-                }
-                return component;
-            });
-        })()}
-      </div>
-      <div className="mt-4 pt-4 border-t border-slate-700 flex justify-end gap-2">
-         <button 
-          onClick={saveSequence} 
-          className="flex items-center px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded disabled:opacity-50"
-          disabled={sequence.length === 0}
-        >
-          <SaveIcon /> {isSaved ? "Saved" : "Save"}
-        </button>
-        <button 
-          onClick={sendSequence}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500"
-          disabled={!isConnected || sequence.length === 0}
-          title={!isConnected ? "Connect wand to send" : ""}
-        >
-          Send to Wand
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
-interface VfxCommandEditorProps {
-  command: VfxCommand;
-  onUpdate: (id: number, params: VfxCommand['params']) => void;
-  onRemove: (id: number) => void;
-  index: number;
-  indent: number;
-}
-const VfxCommandEditor: React.FC<VfxCommandEditorProps> = ({ command, onUpdate, onRemove, index, indent }) => {
-  const handleParamChange = (param: string, value: any) => {
-// FIX: Ensure all parseInt calls use a radix of 10 for safety.
-    const numericValue = ['duration_ms', 'mode', 'transition_ms', 'loops'].includes(param) ? parseInt(value, 10) : value;
-    onUpdate(command.id, { [param]: numericValue });
-  };
-  
-  const isLoopCommand = command.type === 'LoopStart' || command.type === 'LoopEnd';
-
-  return (
-    <div 
-        className={`p-3 rounded-lg flex items-center gap-4 border transition-all duration-200 ${isLoopCommand ? 'bg-green-900/50 border-green-700' : 'bg-slate-800 border-slate-700'}`}
-        style={{ marginLeft: `${indent * 24}px`, width: `calc(100% - ${indent * 24}px)` }}
-    >
-      <div className="text-slate-500 font-mono text-lg w-6 text-center">{index}</div>
-      <div className="flex-grow">
-        <p className="font-semibold text-slate-300">{command.type}</p>
-        <div className="flex items-center gap-4 text-sm mt-1">
-          {command.type === 'LightTransition' && (
-            <>
-              <input 
-                type="color"
-// FIX: Ensure input has a default value to prevent it from becoming uncontrolled.
-                value={command.params.hex_color || '#ffffff'}
-                onChange={(e) => handleParamChange('hex_color', e.target.value)}
-                className="bg-transparent border-none w-8 h-8 p-0"
-              />
-              <label className="flex items-center gap-1">
-                Mode:
-                <input 
-                  type="number"
-                  value={command.params.mode || 0}
-                  onChange={(e) => handleParamChange('mode', e.target.value)}
-                  className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1"
-                />
-              </label>
-               <label className="flex items-center gap-1">
-                Time (ms):
-                <input 
-                  type="number"
-                  value={command.params.transition_ms || 1000}
-                  onChange={(e) => handleParamChange('transition_ms', e.target.value)}
-                  className="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1"
-                />
-              </label>
-            </>
-          )}
-          {(command.type === 'HapticBuzz' || command.type === 'MacroDelay') && (
-            <label className="flex items-center gap-1">
-              Duration (ms):
-              <input 
-                type="number"
-                value={command.params.duration_ms || 500}
-                onChange={(e) => handleParamChange('duration_ms', e.target.value)}
-                className="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1"
-              />
-            </label>
-          )}
-           {command.type === 'LoopEnd' && (
-            <label className="flex items-center gap-1">
-              Repeats:
-              <input 
-                type="number"
-                value={command.params.loops || 2}
-                onChange={(e) => handleParamChange('loops', e.target.value)}
-                className="w-20 bg-slate-900 border border-slate-600 rounded px-2 py-1"
-                min="1"
-                step="1"
-              />
-            </label>
-          )}
-        </div>
-      </div>
-      <button onClick={() => onRemove(command.id)} className="text-slate-500 hover:text-red-400 p-1">
-        <TrashIcon />
-      </button>
-    </div>
-  );
-};
-
-interface DeviceManagerProps {
-  wandConnectionState: ConnectionState;
-  boxConnectionState: ConnectionState;
-  wandDetails: WandDevice | null;
-  boxDetails: WandDevice | null;
-  wandBatteryLevel: number | null;
-  boxBatteryLevel: number | null;
-  onConnectWand: () => void;
-  onConnectBox: () => void;
-  rawWandProductInfo: string | null;
-  rawBoxProductInfo: string | null;
-  isTvBroadcastEnabled: boolean;
-  setIsTvBroadcastEnabled: (enabled: boolean) => void;
-  userHouse: House;
-  setUserHouse: (house: House) => void;
-  userPatronus: string;
-  setUserPatronus: (patronus: string) => void;
-  isHueEnabled: boolean;
-  setIsHueEnabled: (enabled: boolean) => void;
-  hueBridgeIp: string;
-  setHueBridgeIp: (ip: string) => void;
-  hueUsername: string;
-  setHueUsername: (username: string) => void;
-  hueLightId: string;
-  setHueLightId: (id: string) => void;
-  saveHueSettings: () => void;
-  negotiatedMtu: number;
-  commandDelay_ms: number;
-  setCommandDelay_ms: (delay: number) => void;
-  onResetTutorial: () => void;
-  onSendBoxTestMacro: () => void;
-  onRequestBoxAddress: () => void;
-}
-
-const DeviceManager: React.FC<DeviceManagerProps> = ({ wandConnectionState, boxConnectionState, wandDetails, boxDetails, wandBatteryLevel, boxBatteryLevel, onConnectWand, onConnectBox, rawWandProductInfo, rawBoxProductInfo, isTvBroadcastEnabled, setIsTvBroadcastEnabled, userHouse, setUserHouse, userPatronus, setUserPatronus, isHueEnabled, setIsHueEnabled, hueBridgeIp, setHueBridgeIp, hueUsername, setHueUsername, hueLightId, setHueLightId, saveHueSettings, negotiatedMtu, commandDelay_ms, setCommandDelay_ms, onResetTutorial, onSendBoxTestMacro, onRequestBoxAddress }) => {
-    return (
-        <div className="space-y-6 h-full overflow-y-auto pr-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <DeviceCard 
-                    title="Magic Wand" 
-                    connectionState={wandConnectionState} 
-                    details={wandDetails} 
-                    batteryLevel={wandBatteryLevel}
-                    onConnect={onConnectWand}
-                    rawProductInfo={rawWandProductInfo}
-                    wandDetails={wandDetails}
-                    boxDetails={boxDetails}
-                    onRequestBoxAddress={onRequestBoxAddress}
-                />
-                <DeviceCard 
-                    title="Wand Box" 
-                    connectionState={boxConnectionState} 
-                    details={boxDetails} 
-                    batteryLevel={boxBatteryLevel}
-                    onConnect={onConnectBox}
-                    rawProductInfo={rawBoxProductInfo}
-                    wandDetails={wandDetails}
-                    boxDetails={boxDetails}
-                    onSendTestMacro={onSendBoxTestMacro}
-                />
-            </div>
-            {wandConnectionState === ConnectionState.CONNECTED && (
-                <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                    <h3 className="text-xl font-semibold mb-3">Protocol Settings</h3>
-                     <div className="space-y-2">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="font-semibold text-slate-400">Negotiated MTU:</span>
-                            <span className="font-mono bg-slate-700 px-2 py-1 rounded">{negotiatedMtu} bytes</span>
-                        </div>
-                        <div className="flex flex-col text-sm">
-                            <label htmlFor="cmd-delay" className="font-semibold text-slate-400 mb-1">Command Delay (ms):</label>
-                            <input 
-                                id="cmd-delay"
-                                type="range" 
-                                min="0" 
-                                max="200"
-                                step="10"
-                                value={commandDelay_ms}
-                                onChange={(e) => setCommandDelay_ms(parseInt(e.target.value, 10))}
-                                className="w-full"
-                            />
-                            <div className="text-center font-mono text-slate-300">{commandDelay_ms} ms</div>
-                             <p className="text-xs text-slate-500 mt-1">A small delay between commands can improve stability on some systems.</p>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                 <h3 className="text-xl font-semibold mb-3">Integrations</h3>
-                 <div className="space-y-6">
-                    <IntegrationToggle 
-                        title="Smart TV Broadcast" 
-                        description="Simulates sending UDP packets to a smart TV app for spell effects."
-                        isEnabled={isTvBroadcastEnabled}
-                        onToggle={() => setIsTvBroadcastEnabled(!isTvBroadcastEnabled)}
-                    >
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                           <div>
-                                <label htmlFor="user-house" className="block text-sm font-medium text-slate-300 mb-1">Your House</label>
-                                <select 
-                                    id="user-house" 
-                                    value={userHouse} 
-                                    onChange={(e) => setUserHouse(e.target.value as House)}
-                                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
-                                >
-                                  {Houses.map(h => <option key={h} value={h}>{h.charAt(0) + h.slice(1).toLowerCase()}</option>)}
-                                </select>
-                           </div>
-                           <div>
-                                <label htmlFor="user-patronus" className="block text-sm font-medium text-slate-300 mb-1">Your Patronus</label>
-                                <input 
-                                    type="text" 
-                                    id="user-patronus"
-                                    value={userPatronus}
-                                    onChange={(e) => setUserPatronus(e.target.value)}
-                                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
-                                />
-                           </div>
-                       </div>
-                    </IntegrationToggle>
-
-                    <IntegrationToggle
-                        title="Philips Hue Integration"
-                        description="Control a Hue light with spells like Lumos, Nox, and Incendio."
-                        isEnabled={isHueEnabled}
-                        onToggle={() => setIsHueEnabled(!isHueEnabled)}
-                    >
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                           <div>
-                                <label htmlFor="hue-ip" className="block text-sm font-medium text-slate-300 mb-1">Bridge IP Address</label>
-                                <input id="hue-ip" type="text" value={hueBridgeIp} onChange={e => setHueBridgeIp(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2" placeholder="e.g., 192.168.1.100" />
-                           </div>
-                           <div>
-                                <label htmlFor="hue-user" className="block text-sm font-medium text-slate-300 mb-1">Username/Key</label>
-                                <input id="hue-user" type="text" value={hueUsername} onChange={e => setHueUsername(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2" placeholder="Your Hue API key" />
-                           </div>
-                           <div className="sm:col-span-2">
-                                <label htmlFor="hue-light" className="block text-sm font-medium text-slate-300 mb-1">Target Light ID</label>
-                                <input id="hue-light" type="text" value={hueLightId} onChange={e => setHueLightId(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2" placeholder="e.g., 1" />
-                           </div>
-                        </div>
-                        <div className="mt-4 flex justify-end">
-                            <button onClick={saveHueSettings} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold text-sm">Save Hue Settings</button>
-                        </div>
-                    </IntegrationToggle>
-
-                 </div>
-            </div>
-             <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                <h3 className="text-xl font-semibold mb-3">App Settings</h3>
-                <div className="flex justify-between items-center">
-                    <p className="text-sm text-slate-400">Show the introductory tutorial again.</p>
-                    <button
-                        onClick={onResetTutorial}
-                        className="px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg text-sm"
-                    >
-                        Reset Tutorial
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-interface DeviceCardProps {
-    title: string;
-    connectionState: ConnectionState;
-    details: WandDevice | null;
-    batteryLevel: number | null;
-    onConnect: () => void;
-    rawProductInfo: string | null;
-    wandDetails: WandDevice | null;
-    boxDetails: WandDevice | null;
-    onSendTestMacro?: () => void;
-    onRequestBoxAddress?: () => void;
-}
-
-const DeviceCard: React.FC<DeviceCardProps> = ({ title, connectionState, details, batteryLevel, onConnect, rawProductInfo, wandDetails, boxDetails, onSendTestMacro, onRequestBoxAddress }) => {
-    const isConnected = connectionState === ConnectionState.CONNECTED;
-    
-    return (
-        <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xl font-semibold">{title}</h3>
-                <div className="flex items-center gap-2">
-                    {isConnected && <BatteryIcon level={batteryLevel} />}
-                    <StatusBadge state={connectionState} />
-                </div>
-            </div>
-            {isConnected && details ? (
-                <DeviceDetailsCard device={details} rawProductInfo={rawProductInfo} wandDetails={wandDetails} boxDetails={boxDetails} onSendBoxMacro={onSendTestMacro} onRequestBoxAddress={onRequestBoxAddress} />
-            ) : (
-                 <div className="text-center py-8">
-                    <p className="text-slate-400 mb-4">Device is not connected.</p>
-                    <button onClick={onConnect} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md">
-                        Connect to {title}
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-};
-
-interface DeviceDetailsCardProps {
-    device: WandDevice;
-    rawProductInfo: string | null;
-    wandDetails: WandDevice | null;
-    boxDetails: WandDevice | null;
-    onSendBoxMacro?: () => void;
-    onRequestBoxAddress?: () => void;
-}
-
-const DeviceDetailsCard: React.FC<DeviceDetailsCardProps> = ({ device, rawProductInfo, wandDetails, boxDetails, onSendBoxMacro, onRequestBoxAddress }) => {
-    return (
-        <div className="space-y-2 text-sm">
-            <InfoRow label="BLE Name" value={device.bleName} />
-            <InfoRow label="Address" value={device.address} />
-            {device.firmware && <InfoRow label="Firmware" value={device.firmware} />}
-            {device.version !== null && <InfoRow label="Protocol Version" value={String(device.version)} />}
-            {device.wandType !== 'UNKNOWN' && <InfoRow label="Wand Type" value={device.wandType} />}
-            {device.sku && <InfoRow label="SKU" value={device.sku} />}
-            {device.serialNumber !== null && <InfoRow label="Serial" value={String(device.serialNumber)} />}
-            {device.edition && <InfoRow label="Edition" value={device.edition} />}
-            {device.mfgId && <InfoRow label="Mfg ID" value={device.mfgId} />}
-            {device.deviceID && <InfoRow label="Device ID" value={device.deviceID} />}
-            {device.deco && <InfoRow label="Deco" value={device.deco} />}
-            {device.companionAddress && (
-                <div className="flex justify-between items-center text-slate-400">
-                    <span className="font-semibold">Companion:</span>
-                    <div className="flex items-center gap-2">
-                       <span className="font-mono bg-slate-700 px-2 py-1 rounded">{device.companionAddress}</span>
-                       {device.deviceType === 'WAND' && wandDetails?.companionAddress === boxDetails?.address && <LinkIcon />}
-                       {device.deviceType === 'BOX' && boxDetails?.companionAddress === wandDetails?.address && <LinkIcon />}
-                    </div>
-                </div>
-            )}
-            {rawProductInfo && <InfoRow label="Raw Prod Info" value={rawProductInfo} isMono />}
-
-            {device.deviceType === 'WAND' && onRequestBoxAddress && (
-                <div className="pt-3 mt-2 border-t border-slate-700">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h4 className="font-semibold text-slate-300">Companion Link</h4>
-                            <p className="text-xs text-slate-400">Request Box MAC address from Wand.</p>
-                        </div>
-                        <button
-                            onClick={onRequestBoxAddress}
-                            className="px-3 py-1 text-xs rounded bg-slate-600 hover:bg-slate-500"
-                        >
-                            Request
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {device.deviceType === 'BOX' && onSendBoxMacro && (
-                <div className="pt-3 mt-2 border-t border-slate-700">
-                    <h4 className="font-semibold text-slate-300 mb-2">Direct Macro Test</h4>
-                    <p className="text-xs text-slate-400 mb-3">Test the box's ability to run VFX sequences, confirmed by smali analysis of the WandBoxHelper.</p>
-                    <button 
-                        onClick={onSendBoxMacro}
-                        className="w-full px-3 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold text-sm"
-                    >
-                        Send 'Blue Pulse' Test
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-}
-
-
-const InfoRow = ({ label, value, isMono = false }: { label: string, value: string, isMono?: boolean }) => (
-    <div className="flex justify-between items-center text-slate-400">
-        <span className="font-semibold">{label}:</span>
-        <span className={isMono ? 'font-mono bg-slate-700 px-2 py-1 rounded' : 'text-slate-300'}>{value}</span>
-    </div>
-);
-
-interface IntegrationToggleProps {
-    title: string;
-    description: string;
-    isEnabled: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}
-
-const IntegrationToggle: React.FC<IntegrationToggleProps> = ({ title, description, isEnabled, onToggle, children }) => {
-    return (
-        <div className="border-t border-slate-700 pt-4">
-             <div className="flex justify-between items-start">
-                <div>
-                    <h4 className="font-semibold text-lg text-slate-200">{title}</h4>
-                    <p className="text-sm text-slate-400">{description}</p>
-                </div>
-                <div className="relative inline-block w-12 ml-2 align-middle select-none transition duration-200 ease-in">
-                    <input 
-                        type="checkbox" 
-                        name={title.replace(' ', '-')} 
-                        id={title.replace(' ', '-')}
-                        checked={isEnabled}
-                        onChange={onToggle}
-                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                    />
-                    <label 
-                        htmlFor={title.replace(' ', '-')}
-                        className="toggle-label block overflow-hidden h-6 rounded-full bg-slate-600 cursor-pointer"
-                    ></label>
-                </div>
-            </div>
-            {isEnabled && <div className="mt-4 p-4 bg-slate-800/50 rounded-lg">{children}</div>}
-        </div>
-    )
-};
-
-interface SpellBookProps {
-    spellBook: Spell[];
-    discoveredSpells: Set<string>;
-    discoveredCount: number;
-    totalCount: number;
-    spellFilter: string;
-    setSpellFilter: (filter: string) => void;
-}
-
-const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, discoveredCount, totalCount, spellFilter, setSpellFilter }) => {
-    const filteredSpells = React.useMemo(() => {
-        return SPELL_LIST
-            .map(name => ({ name, discovered: discoveredSpells.has(name.toUpperCase()) }))
-            .filter(spell => spell.name.toLowerCase().includes(spellFilter.toLowerCase()))
-            .sort((a, b) => {
-                if (a.discovered && !b.discovered) return -1;
-                if (!a.discovered && b.discovered) return 1;
-                return a.name.localeCompare(b.name);
-            });
-    }, [spellFilter, discoveredSpells]);
-
-    return (
-        <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 h-full flex flex-col">
-            <h2 className="text-lg font-semibold mb-1">Spell Book</h2>
-            <div className="text-sm text-slate-400 mb-3">
-                Discovered: <span className="font-bold text-indigo-400">{discoveredCount} / {totalCount}</span>
-            </div>
-            <input 
-                type="text"
-                placeholder="Search spells..."
-                value={spellFilter}
-                onChange={(e) => setSpellFilter(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 mb-3 text-sm"
-            />
-            <div className="flex-grow overflow-y-auto pr-2">
-                <ul className="space-y-1">
-                    {filteredSpells.map(spell => (
-                        <li 
-                            key={spell.name} 
-                            className={`text-sm p-1 rounded ${spell.discovered ? 'text-green-300 font-semibold' : 'text-slate-400'}`}
-                            title={spell.discovered ? 'Discovered' : 'Not yet cast'}
-                        >
-                            {spell.name}
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    );
-};
-
-interface DiagnosticsProps {
-  detectedOpCodes: Set<number>;
-  rawPacketLog: RawPacket[];
-  bleEventLog: BleEvent[];
-  isImuStreaming: boolean;
-  toggleImuStream: () => void;
-  handleImuCalibrate: () => void;
-  latestImuData: IMUReading[] | null;
-  buttonState: [boolean, boolean, boolean, boolean];
-  smaliInput: string;
-  setSmaliInput: (input: string) => void;
-  analyzeSmaliWithGemini: () => void;
-  isAnalyzingSmali: boolean;
-  smaliAnalysis: string;
-  isClientSideGestureDetectionEnabled: boolean;
-  setIsClientSideGestureDetectionEnabled: (enabled: boolean) => void;
-  gestureThreshold: number;
-  setGestureThreshold: (threshold: number) => void;
-  clientSideGestureDetected: boolean;
-  buttonThresholds: ButtonThresholds[];
-  handleReadButtonThresholds: () => void;
-  wandConnectionState: ConnectionState;
-  queueCommand: (payload: Uint8Array, silent?: boolean) => void;
-}
-
-const Diagnostics: React.FC<DiagnosticsProps> = ({ detectedOpCodes, rawPacketLog, bleEventLog, isImuStreaming, toggleImuStream, handleImuCalibrate, latestImuData, buttonState, smaliInput, setSmaliInput, analyzeSmaliWithGemini, isAnalyzingSmali, smaliAnalysis, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled, gestureThreshold, setGestureThreshold, clientSideGestureDetected, buttonThresholds, handleReadButtonThresholds, wandConnectionState, queueCommand }) => {
-    const sortedOpcodes = React.useMemo(() => Array.from(detectedOpCodes).sort((a, b) => a - b), [detectedOpCodes]);
-    const isWandConnected = wandConnectionState === ConnectionState.CONNECTED;
-    
-    return (
-        <div className="h-full flex flex-col space-y-4">
-            <h3 className="text-xl font-semibold">Diagnostics & Reverse Engineering</h3>
-            <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-                <div className="flex flex-col gap-4">
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                        <h4 className="font-semibold mb-2">Live Status</h4>
-                         <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span>Grip Status:</span>
-                                <div className="flex gap-2">
-                                    {buttonState.map((pressed: boolean, i: number) => (
-                                        <span key={i} className={`w-4 h-4 rounded-full border border-slate-500 ${pressed ? 'bg-yellow-400' : 'bg-slate-700'}`}></span>
-                                    ))}
-                                </div>
-                            </div>
-                             <div className="pt-2">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-semibold text-slate-400">Grip Thresholds</span>
-                                    <button onClick={handleReadButtonThresholds} className="px-3 py-1 text-xs rounded bg-slate-600 hover:bg-slate-500 disabled:opacity-50" disabled={!isWandConnected}>
-                                        Read Values
-                                    </button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-xs bg-slate-800 p-2 rounded">
-                                    {buttonThresholds.map((t, i) => (
-                                        <div key={i} className="text-slate-300">
-                                            Button {i+1}: Min={t.min ?? '--'} / Max={t.max ?? '--'}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="flex justify-between items-center border-t border-slate-700 pt-2 mt-2">
-                                <span>IMU Controls:</span>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={handleImuCalibrate} className="px-3 py-1 text-xs rounded bg-slate-600 hover:bg-slate-500 disabled:opacity-50" disabled={!isWandConnected}>
-                                        Calibrate
-                                    </button>
-                                    <button onClick={toggleImuStream} className={`px-3 py-1 text-xs rounded ${isImuStreaming ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'}`} disabled={!isWandConnected}>
-                                        {isImuStreaming ? 'Stop Stream' : 'Start Stream'}
-                                    </button>
-                                </div>
-                            </div>
-                            {isImuStreaming && latestImuData && (
-                                <div className="font-mono text-xs bg-slate-800 p-2 rounded">
-                                    <p>Accel: {latestImuData[0].acceleration.x.toFixed(2)}, {latestImuData[0].acceleration.y.toFixed(2)}, {latestImuData[0].acceleration.z.toFixed(2)}</p>
-                                    <p>Gyro: {latestImuData[0].gyroscope.x.toFixed(2)}, {latestImuData[0].gyroscope.y.toFixed(2)}, {latestImuData[0].gyroscope.z.toFixed(2)}</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="border-t border-slate-700 mt-3 pt-3">
-                            <h5 className="font-semibold mb-2 text-base">Client-Side Gesture Detection</h5>
-                            <div className="space-y-3 text-sm">
-                                <div className="flex justify-between items-center">
-                                    <span>Enable Detector:</span>
-                                    <div className="relative inline-block w-10 ml-2 align-middle select-none">
-                                        {/* FIX: Replaced an inline style attribute with a Tailwind CSS utility class. The original inline style was causing a JSX parsing error that manifested as an arithmetic operation error. */}
-                                        <input
-                                            type="checkbox"
-                                            checked={isClientSideGestureDetectionEnabled}
-                                            onChange={(e) => setIsClientSideGestureDetectionEnabled(e.target.checked)}
-                                            className="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                                        />
-                                        <label className="toggle-label block overflow-hidden h-5 rounded-full bg-slate-600 cursor-pointer"></label>
-                                    </div>
-                                </div>
-                                 <div className="flex justify-between items-center">
-                                     <label htmlFor="threshold-input">Threshold (g):</label>
-                                     <input 
-                                        id="threshold-input"
-                                        type="number" 
-                                        value={gestureThreshold}
-                                        onChange={(e) => setGestureThreshold(parseFloat(e.target.value))}
-                                        step="0.1"
-                                        min="0.5"
-                                        max="10"
-                                        disabled={!isClientSideGestureDetectionEnabled}
-                                        className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm disabled:opacity-50"
-                                    />
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <span>Status:</span>
-                                    <span className={`px-2 py-1 rounded text-xs ${clientSideGestureDetected ? 'bg-green-500/30 text-green-300 animate-pulse' : 'bg-slate-700 text-slate-300'}`}>
-                                        {clientSideGestureDetected ? 'MOTION DETECTED' : 'Idle'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                        <h4 className="font-semibold mb-2">Direct Commands & Macros</h4>
-                        <p className="text-xs text-slate-400 mb-3">Send single opcodes or trigger built-in effects discovered from smali files.</p>
-                        
-                        <div className="border-b border-slate-700 pb-3 mb-3">
-                            <h5 className="text-sm font-semibold text-slate-400 mb-2">Single Opcodes</h5>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <button onClick={() => queueCommand(WBDLPayloads.MACRO_FLUSH_CMD)} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Flush Macro
-                                </button>
-                                <button onClick={() => queueCommand(WBDLPayloads.LIGHT_CLEAR_ALL_CMD)} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Clear Lights
-                                </button>
-                                <button onClick={() => queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD)} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Req Firmware
-                                </button>
-                                <button onClick={() => queueCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD)} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Req Prod Info
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h5 className="text-sm font-semibold text-slate-400 mb-2">Predefined Macros (Guesses)</h5>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.PAIRING]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Pairing Effect
-                                </button>
-                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.READY_TO_CAST_NO_HAPTIC]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Ready To Cast
-                                </button>
-                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.GENERIC_ERROR]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Error Effect
-                                </button>
-                                 <button onClick={() => queueCommand(new Uint8Array([WBDLProtocol.CMD.EXECUTE_PREDEFINED_MACRO, WBDLProtocol.PREDEFINED_MACRO_ID.AGUAMENTI]))} className="w-full text-center px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled={!isWandConnected} title={!isWandConnected ? "Connect wand to use" : ""}>
-                                    Aguamenti
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col gap-4 min-h-0">
-                     <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-shrink-0">
-                        <h4 className="font-semibold mb-2">Detected Opcodes (Incoming)</h4>
-                        {sortedOpcodes.length > 0 ? (
-                           <div className="flex flex-wrap gap-2">
-                                {sortedOpcodes.map(code => (
-                                    <span key={code} className="font-mono bg-slate-700 px-2 py-1 rounded-full text-xs">0x{code.toString(16).padStart(2, '0')}</span>
-                                ))}
-                           </div>
-                        ) : (
-                           <p className="text-sm text-slate-500">No unknown opcodes detected yet. Interact with the wand to discover them.</p>
-                        )}
-                    </div>
-                    
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col min-h-0">
-                        <h4 className="font-semibold mb-2">Raw Packet Log</h4>
-                        <div className="flex-grow bg-slate-950 rounded p-2 overflow-y-auto font-mono text-xs">
-                           {rawPacketLog.map(p => (
-                                <div key={p.id}>
-                                    <span className="text-slate-500">{p.timestamp}</span> <span className="text-purple-400">{p.hexData}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col md:col-span-2 min-h-0">
-                     <h4 className="font-semibold mb-2">Smali Analyzer (via Gemini)</h4>
-                     <p className="text-sm text-slate-400 mb-3">Paste smali code from the app's decompiled source to get an analysis of its BLE protocol logic.</p>
-                     <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 min-h-0">
-                         <div className="flex flex-col">
-                             <textarea 
-                                value={smaliInput}
-                                onChange={e => setSmaliInput(e.target.value)}
-                                placeholder="Paste smali code here..."
-                                className="w-full flex-grow bg-slate-950 border border-slate-600 rounded-lg p-2 font-mono text-xs resize-none"
-                             />
-                             <button onClick={analyzeSmaliWithGemini} disabled={isAnalyzingSmali} className="w-full mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500">
-                                 {isAnalyzingSmali ? 'Analyzing...' : 'Analyze with Gemini'}
-                             </button>
-                         </div>
-                         <div className="bg-slate-950 rounded-lg border border-slate-600 p-4 overflow-y-auto">
-                            {isAnalyzingSmali ? (
-                                <p className="text-slate-400 animate-pulse">Gemini is thinking...</p>
-                            ) : (
-                                <div className="prose prose-sm prose-invert" dangerouslySetInnerHTML={{ __html: smaliAnalysis || '<p class="text-slate-500">Analysis will appear here.</p>' }}></div>
-                            )}
-                         </div>
-                     </div>
-                 </div>
-
-                 <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 md:col-span-2">
-                     <h4 className="font-semibold mb-2">BLE Event Log</h4>
-                      <div className="h-48 bg-slate-950 rounded p-2 overflow-y-auto font-mono text-xs">
-                         {bleEventLog.map(e => (
-                             <div key={e.id}>
-                                 <span className="text-slate-500">{e.timestamp}</span>
-                                 <span className="text-cyan-400 font-bold"> [{e.event}] </span>
-                                 <span className="text-slate-300">{e.detail}</span>
-                             </div>
-                         ))}
-                     </div>
-                 </div>
-            </div>
-        </div>
-    );
-};
-
-interface SpellCompendiumProps {
-    spellBook: Spell[];
-    onSelectSpell: (spellName: string) => void;
-    onUnlockAll: () => void;
-}
-
-const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, onSelectSpell, onUnlockAll }) => {
-    const [filter, setFilter] = React.useState('');
-
-    const filteredSpells = React.useMemo(() => {
-        return SPELL_LIST
-            .filter(name => name.toLowerCase().includes(filter.toLowerCase()))
-            .sort((a, b) => a.localeCompare(b));
-    }, [filter]);
-
-    return (
-        <div className="h-full flex flex-col">
-            <h3 className="text-xl font-semibold mb-2">Spell Compendium</h3>
-            <p className="text-slate-400 mb-4 text-sm">Explore all known spells. Click a spell to view its details and VFX macro, powered by Gemini. Spells you have personally cast are highlighted.</p>
-            <div className="flex gap-2 mb-4">
-                <input 
-                    type="text"
-                    value={filter}
-                    onChange={e => setFilter(e.target.value)}
-                    placeholder="Search all spells..."
-                    className="flex-grow w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
-                />
-                <button
-                    onClick={onUnlockAll}
-                    className="flex flex-shrink-0 items-center px-4 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold rounded-lg text-sm"
-                    title="Add all spells from the master list to your discovered spell book."
-                >
-                    <SparklesIcon />
-                    Unlock All
-                </button>
-            </div>
-            <div className="flex-grow overflow-y-auto pr-2">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {filteredSpells.map(spellName => {
-                        const isDiscovered = spellBook.some(s => s.name === spellName);
-                        return (
-                            <button
-                                key={spellName}
-                                onClick={() => onSelectSpell(spellName)}
-                                className={`p-2 rounded text-left text-sm transition-colors ${
-                                    isDiscovered 
-                                        ? 'bg-green-800/50 hover:bg-green-700/50 border border-green-700 text-green-300' 
-                                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                                }`}
-                            >
-                                {spellName.replace(/_/g, ' ')}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-interface ModalProps {
-    title: string;
-    onClose: () => void;
-    children: React.ReactNode;
-}
-const Modal: React.FC<ModalProps> = ({ title, onClose, children }) => (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in" onClick={onClose}>
-        <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl border border-slate-700 m-4" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-4 border-b border-slate-700">
-                <h2 className="text-lg font-semibold">{title}</h2>
-                <button onClick={onClose} className="text-slate-400 hover:text-white">&times;</button>
-            </div>
-            <div className="p-6 max-h-[80vh] overflow-y-auto">
-                {children}
-            </div>
-        </div>
-    </div>
-);
-
-
-interface BleExplorerProps {
-    onScan: () => void;
-    isExploring: boolean;
-    device: BluetoothDevice | null;
-    services: ExplorerService[];
-}
-const BleExplorer: React.FC<BleExplorerProps> = ({ onScan, isExploring, device, services }) => {
-    return (
-        <div className="h-full flex flex-col">
-            <h3 className="text-xl font-semibold mb-2">BLE Service Explorer</h3>
-            <p className="text-slate-400 mb-4 text-sm">Scan for any nearby BLE device and inspect its services and characteristics. This is a generic tool for exploring devices beyond the Magic Wand.</p>
-            <div className="flex-shrink-0 mb-4">
-                <button onClick={onScan} disabled={isExploring} className="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500">
-                    {isExploring ? 'Scanning...' : 'Start Scan'}
-                </button>
-            </div>
-            <div className="flex-grow overflow-y-auto pr-2">
-                {device && (
-                    <div className="bg-slate-900/50 p-3 rounded-lg mb-4 border border-slate-700">
-                        <p className="font-semibold">Device: <span className="font-normal text-indigo-400">{device.name || 'N/A'}</span></p>
-                        <p className="font-semibold text-xs">ID: <span className="font-mono text-slate-400">{device.id}</span></p>
-                    </div>
-                )}
-                {services.length > 0 ? (
-                    <div className="space-y-3">
-                        {services.map(service => (
-                            <div key={service.uuid} className="bg-slate-900/50 p-3 rounded-lg border border-slate-700">
-                                <p className="font-semibold text-green-400">Service: {service.uuid}</p>
-                                <ul className="mt-2 pl-4 space-y-1">
-                                    {service.characteristics.map(char => (
-                                        <li key={char.uuid}>
-                                            <p className="text-cyan-400">Characteristic: {char.uuid}</p>
-                                            <p className="text-xs text-slate-400">
-                                                Properties: {Object.entries(char.properties)
-                                                    .filter(([, value]) => value)
-                                                    .map(([key]) => key)
-                                                    .join(', ') || 'none'}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-slate-500 text-center">{isExploring ? 'Waiting for connection...' : 'Scan a device to see its services.'}</p>
-                )}
-            </div>
-        </div>
-    );
-};

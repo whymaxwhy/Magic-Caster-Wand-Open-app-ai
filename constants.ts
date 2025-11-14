@@ -63,6 +63,7 @@ export const WBDLProtocol = {
     STATUS_FIRMWARE_REQUEST: 0x00,
     STATUS_BATTERY_REQUEST: 0x01,
     BOX_ADDRESS_REQUEST: 0x09, // New from smali: Request for paired box address
+    FACTORY_UNLOCK_REQUEST: 0x0B, // New from WandHelper.smali: Sent before calibration
     PRODUCT_INFO_REQUEST: 0x0D, // GUESS: Request for SKU, serial, etc. based on existence of response
     IMU_STREAM_START: 0x30,
     IMU_STREAM_STOP: 0x31,
@@ -127,6 +128,7 @@ export const WBDLPayloads = {
     IMU_START_STREAM_CMD: new Uint8Array([WBDLProtocol.CMD.IMU_STREAM_START, 0x80, 0x00, 0x00, 0x00]),
     IMU_STOP_STREAM_CMD: new Uint8Array([WBDLProtocol.CMD.IMU_STREAM_STOP]),
     IMU_CALIBRATE_CMD: new Uint8Array([WBDLProtocol.CMD.IMU_CALIBRATE]),
+    FACTORY_UNLOCK_CMD: new Uint8Array([WBDLProtocol.CMD.FACTORY_UNLOCK_REQUEST]),
     LIGHT_CLEAR_ALL_CMD: new Uint8Array([WBDLProtocol.CMD.LIGHT_CLEAR_ALL]),
     MACRO_FLUSH_CMD: new Uint8Array([WBDLProtocol.CMD.MACRO_FLUSH]),
     FIRMWARE_REQUEST_CMD: new Uint8Array([WBDLProtocol.CMD.STATUS_FIRMWARE_REQUEST]),
