@@ -168,59 +168,101 @@ interface CastingModalProps {
     isImuStreaming: boolean;
     toggleImuStream: () => void;
     latestImuData: IMUReading[] | null;
+    drawingSensitivity: number;
+    pathSmoothing: number;
 }
 
-const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastAttempt, isImuStreaming, toggleImuStream, latestImuData }) => {
+const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastAttempt, isImuStreaming, toggleImuStream, latestImuData, drawingSensitivity, pathSmoothing }) => {
     const [isRecording, setIsRecording] = useState(false);
     const [drawnPath, setDrawnPath] = useState<Point[]>([]);
     const wasStreaming = useRef(false);
-    
+
+    const pointQueueRef = useRef<Point[]>([]);
+    const lastPositionRef = useRef<Point>({ x: 50, y: 50 });
+    const animationFrameId = useRef<number | null>(null);
+
+    // Effect to process IMU data and add it to a queue for smooth rendering
     useEffect(() => {
         if (!isRecording || !latestImuData || latestImuData.length === 0) {
             return;
         }
 
-        setDrawnPath(prevPath => {
-            const dt = 1 / 100; // Assume 100Hz sample rate from wand
-            const scaleFactor = 15; // Tuned for better drawing feel and accuracy
-            let lastPos = prevPath.length > 0 ? prevPath[prevPath.length - 1] : { x: 50, y: 50 };
+        // FIX: The gyroscope integration time step was too small, making wand
+        // movements nearly invisible. It has been adjusted to a more realistic
+        // value (assuming ~30Hz effective sample rate) to ensure the drawn path is
+        // clearly visible and responsive.
+        const dt = 1 / 30; 
+        let currentPos = lastPositionRef.current;
+        const newPoints: Point[] = [];
 
-            const newPoints: Point[] = [];
-            for (const reading of latestImuData) {
-                // Integrate gyroscope data to get position
-                const newX = lastPos.x + reading.gyroscope.y * dt * scaleFactor;
-                const newY = lastPos.y - reading.gyroscope.x * dt * scaleFactor;
-                
-                // Clamp to viewbox bounds
-                const nextPoint = {
-                    x: Math.max(0, Math.min(100, newX)),
-                    y: Math.max(0, Math.min(100, newY)),
-                };
-                newPoints.push(nextPoint);
-                lastPos = nextPoint; 
+        for (const reading of latestImuData) {
+            const rawX = currentPos.x + reading.gyroscope.y * dt * drawingSensitivity;
+            const rawY = currentPos.y - reading.gyroscope.x * dt * drawingSensitivity;
+            
+            const alpha = 1 - pathSmoothing;
+            const smoothedX = alpha * rawX + (1 - alpha) * currentPos.x;
+            const smoothedY = alpha * rawY + (1 - alpha) * currentPos.y;
+
+            const nextPoint = {
+                x: Math.max(0, Math.min(100, smoothedX)),
+                y: Math.max(0, Math.min(100, smoothedY)),
+            };
+            newPoints.push(nextPoint);
+            currentPos = nextPoint;
+        }
+
+        pointQueueRef.current.push(...newPoints);
+        lastPositionRef.current = currentPos;
+
+    }, [latestImuData, isRecording, drawingSensitivity, pathSmoothing]);
+
+    // Effect to run the animation loop for drawing the path smoothly
+    useEffect(() => {
+        if (isRecording) {
+            const animate = () => {
+                if (pointQueueRef.current.length > 0) {
+                    const pointsToProcess = Math.min(pointQueueRef.current.length, 3);
+                    const pointsToAdd = pointQueueRef.current.splice(0, pointsToProcess);
+                    setDrawnPath(prev => [...prev, ...pointsToAdd]);
+                }
+                animationFrameId.current = requestAnimationFrame(animate);
+            };
+            animationFrameId.current = requestAnimationFrame(animate);
+        }
+
+        return () => {
+            if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current);
             }
+        };
+    }, [isRecording]);
 
-            return [...prevPath, ...newPoints];
-        });
-
-    }, [latestImuData, isRecording]);
-    
     const handleToggleRecording = () => {
         if (!isRecording) {
             wasStreaming.current = isImuStreaming;
             if (!isImuStreaming) {
                 toggleImuStream();
             }
-            setDrawnPath([{ x: 50, y: 50 }]); // Start path at the center
+            const startPoint = { x: 50, y: 50 };
+            setDrawnPath([startPoint]);
+            lastPositionRef.current = startPoint;
+            pointQueueRef.current = [];
             setIsRecording(true);
         } else {
             setIsRecording(false);
+            if (animationFrameId.current) {
+                cancelAnimationFrame(animationFrameId.current);
+            }
             if (!wasStreaming.current) {
                 toggleImuStream();
             }
-            const targetPath = svgPathToPoints(spell.gesturePath, GESTURE_SAMPLE_POINTS);
-            const score = comparePaths(drawnPath, targetPath);
-            handleCastAttempt(score < SUCCESS_THRESHOLD);
+            
+            setTimeout(() => {
+                const finalDrawnPath = [...drawnPath, ...pointQueueRef.current];
+                const targetPath = svgPathToPoints(spell.gesturePath, GESTURE_SAMPLE_POINTS);
+                const score = comparePaths(finalDrawnPath, targetPath);
+                handleCastAttempt(score < SUCCESS_THRESHOLD);
+            }, 100);
         }
     };
 
@@ -232,11 +274,28 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
                 <div className="p-6">
                     <h3 className="text-2xl font-bold text-indigo-400">Cast: {spell.name}</h3>
                     <p className="text-slate-400 mb-4">Trace the gesture with your wand.</p>
-                    <div className="bg-slate-950 rounded-lg aspect-square w-full border border-slate-600 overflow-hidden">
-                        <svg viewBox="0 0 100 100">
-                            <path d={spell.gesturePath} stroke="#4F46E5" strokeWidth="2" fill="none" strokeDasharray="4" />
+                    <div className="relative bg-slate-950 rounded-lg aspect-square w-full border border-slate-600 overflow-hidden">
+                        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
+                            <defs>
+                                <filter id="wand-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <path d={spell.gesturePath} stroke="#4F46E5" strokeWidth="2" fill="none" strokeDasharray="4" opacity="0.7" />
                             {drawnPath.length > 1 && (
-                                <polyline points={drawnPathString} stroke="#34D399" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                                <polyline 
+                                    points={drawnPathString} 
+                                    stroke="#34D399" 
+                                    strokeWidth="2" 
+                                    fill="none" 
+                                    strokeLinecap="round" 
+                                    strokeLinejoin="round" 
+                                    filter="url(#wand-glow)"
+                                />
                             )}
                         </svg>
                     </div>
@@ -294,6 +353,8 @@ const WizardingClass: React.FC<WizardingClassProps> = ({ isImuStreaming, toggleI
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isCastingModalOpen, setIsCastingModalOpen] = useState(false);
+  const [drawingSensitivity, setDrawingSensitivity] = useState(15);
+  const [pathSmoothing, setPathSmoothing] = useState(0.4);
 
   const xpToNextLevel = useMemo(() => {
     return Math.floor(LEVEL_XP_BASE * Math.pow(1.5, level - 1));
@@ -367,6 +428,8 @@ const WizardingClass: React.FC<WizardingClassProps> = ({ isImuStreaming, toggleI
                 isImuStreaming={isImuStreaming}
                 toggleImuStream={toggleImuStream}
                 latestImuData={latestImuData}
+                drawingSensitivity={drawingSensitivity}
+                pathSmoothing={pathSmoothing}
             />
         )}
         <h3 className="text-3xl font-bold text-indigo-400">Wizarding Class: Spell Challenges</h3>
@@ -386,6 +449,39 @@ const WizardingClass: React.FC<WizardingClassProps> = ({ isImuStreaming, toggleI
                     className="bg-indigo-600 h-4 rounded-full transition-all duration-500"
                     style={{ width: `${xpPercentage}%` }}
                 ></div>
+            </div>
+        </div>
+        
+        {/* Practice Settings */}
+        <div className="w-full max-w-2xl bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="font-semibold text-lg mb-2">Practice Settings</h4>
+            <div className="space-y-3">
+                <div>
+                    <label htmlFor="sensitivity-slider" className="block text-sm font-medium text-slate-400">Drawing Sensitivity: {drawingSensitivity}</label>
+                    <input 
+                        id="sensitivity-slider"
+                        type="range" 
+                        min="5" 
+                        max="30" 
+                        step="1"
+                        value={drawingSensitivity} 
+                        onChange={e => setDrawingSensitivity(Number(e.target.value))} 
+                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
+                <div>
+                    <label htmlFor="smoothing-slider" className="block text-sm font-medium text-slate-400">Path Smoothing: {(pathSmoothing * 100).toFixed(0)}%</label>
+                    <input 
+                        id="smoothing-slider"
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05"
+                        value={pathSmoothing} 
+                        onChange={e => setPathSmoothing(Number(e.target.value))} 
+                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    />
+                </div>
             </div>
         </div>
         
