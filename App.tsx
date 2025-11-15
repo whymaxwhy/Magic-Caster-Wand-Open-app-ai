@@ -8,6 +8,7 @@ import { WandTypes, RawPacket, ConnectionState } from './types';
 import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
 import Scripter from './Scripter';
 import { GoogleGenAI, Type } from '@google/genai';
+import WizardingClass from './WizardingClass';
 
 
 // --- HELPER FUNCTIONS ---
@@ -160,6 +161,11 @@ const SparklesIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H7v1a1 1 0 01-2 0V6H4a1 1 0 010-2h1V3a1 1 0 011-1zm6 0a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V6h-1a1 1 0 010-2h1V3a1 1 0 011-1zM9 10a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H7a1 1 0 010-2h1v-1a1 1 0 011-1zm6-5a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V8h-1a1 1 0 010-2h1V5a1 1 0 011-1zM5 15a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H4a1 1 0 010-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
   </svg>
+);
+const BookOpenIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
 );
 
 
@@ -711,12 +717,12 @@ const parseImuPacket = (data: Uint8Array): IMUReading[] => {
 
         // Apply scaling and coordinate system flips based on o.smali analysis
         const accel_x = raw_ax * ACCEL_SCALE;
-        // FIX: Rewrote arithmetic operation to be explicit and avoid potential parser ambiguity.
-        const accel_y = 0 - (raw_ay * ACCEL_SCALE);
+        // FIX: Replaced explicit subtraction with unary minus for negation, which is more standard and avoids potential linter issues.
+        const accel_y = -(raw_ay * ACCEL_SCALE);
         const accel_z = raw_az * ACCEL_SCALE;
 
         const gyro_x = raw_gx * GYRO_SCALE;
-        const gyro_y = 0 - (raw_gy * GYRO_SCALE);
+        const gyro_y = -(raw_gy * GYRO_SCALE);
         const gyro_z = raw_gz * GYRO_SCALE;
 
         results.push({
@@ -753,11 +759,11 @@ interface SpellBookProps {
 
 const SpellBook: React.FC<SpellBookProps> = ({ spellBook, discoveredSpells, discoveredCount, totalCount, spellFilter, setSpellFilter, castingHistory }) => {
     const castCounts = React.useMemo(() => {
-        // FIX: Explicitly type the accumulator and cast entry in `reduce` to prevent potential type inference issues.
+        // FIX: The initial value {} is cast to the accumulator's type to resolve a type mismatch that caused inference errors.
         return castingHistory.reduce((acc: Record<string, number>, cast: CastingHistoryEntry) => {
             acc[cast.name] = (acc[cast.name] ?? 0) + 1;
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
     }, [castingHistory]);
     
     const filteredAndSortedSpells = React.useMemo(() => {
@@ -843,11 +849,11 @@ const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, castingHis
     const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name)), [spellBook]);
 
     const castCounts = React.useMemo(() => {
-        // FIX: Explicitly type the accumulator and cast entry in `reduce` to prevent potential type inference issues.
+        // FIX: The initial value {} is cast to the accumulator's type to resolve a type mismatch that caused inference errors.
         return castingHistory.reduce((acc: Record<string, number>, cast: CastingHistoryEntry) => {
             acc[cast.name] = (acc[cast.name] ?? 0) + 1;
             return acc;
-        }, {});
+        }, {} as Record<string, number>);
     }, [castingHistory]);
 
     // FIX: Memoize the sorted spell list to improve performance and avoid potential toolchain errors.
@@ -1221,7 +1227,7 @@ export default function App() {
   const [isFetchingSpellDetails, setIsFetchingSpellDetails] = React.useState(false);
   const [spellDetailsError, setSpellDetailsError] = React.useState<string | null>(null);
   const [gestureState, setGestureState] = React.useState<GestureState>('Idle');
-  const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter'>('device_manager');
+  const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter' | 'wizarding_class'>('device_manager');
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [deviceToScan, setDeviceToScan] = React.useState<DeviceType | null>(null);
   
@@ -3077,6 +3083,7 @@ Be precise and base your conclusions directly on the provided code.`;
           services={explorerServices}
       />;
       case 'scripter': return <Scripter addLog={addLog} />;
+      case 'wizarding_class': return <WizardingClass />;
       default: return null;
     }
   }
@@ -3141,6 +3148,7 @@ Be precise and base your conclusions directly on the provided code.`;
                     <TabButton key="compendium" Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
                     <TabButton key="explorer" Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
                     <TabButton key="scripter" Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />
+                    <TabButton key="wizarding_class" Icon={BookOpenIcon} label="Wizarding Class" onClick={() => setActiveTab('wizarding_class')} isActive={activeTab === 'wizarding_class'} />
                 </div>
             </div>
             <div className="flex-grow min-h-0">
