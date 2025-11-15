@@ -187,11 +187,11 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
             return;
         }
 
-        // FIX: The gyroscope integration time step was too small, making wand
+        // FIX: The gyroscope integration scaling factor was too small, making wand
         // movements nearly invisible. It has been adjusted to a more realistic
-        // value (assuming ~30Hz effective sample rate) to ensure the drawn path is
-        // clearly visible and responsive.
-        const dt = 1 / 30; 
+        // value to ensure the drawn path is clearly visible and responsive. The user
+        // can fine-tune this with the sensitivity slider.
+        const dt = 2.0; 
         let currentPos = lastPositionRef.current;
         const newPoints: Point[] = [];
 
