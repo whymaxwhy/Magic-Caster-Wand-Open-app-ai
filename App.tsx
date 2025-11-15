@@ -5,14 +5,16 @@
 
 
 
+
+
+
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
-import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_BOX_REACTIONS } from './constants';
+import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_DETAILS_DATA } from './constants';
 // FIX: Added RawPacket to the import list from types.ts.
 import { WandTypes, RawPacket, ConnectionState } from './types';
 import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
 import Scripter from './Scripter';
-import { GoogleGenAI, Type } from '@google/genai';
 import WizardingClass from './WizardingClass';
 
 
@@ -217,7 +219,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish }) => {
     },
     {
       title: "Step 2: Cast Spells",
-      content: "Once your wand is connected, use it to cast a spell! The 'Control Hub' will show you the last spell you cast and display detailed information about it, powered by Gemini."
+      content: "Once your wand is connected, use it to cast a spell! The 'Control Hub' will show you the last spell you cast and display detailed information about it from its local spellbook."
     },
     {
       title: "Step 3: Create Custom Effects",
@@ -523,19 +525,11 @@ const VfxEditor: React.FC<{
 
 const SpellDetailsCard: React.FC<{
   spellDetails: SpellDetails | null;
-  isLoading: boolean;
-  error: string | null;
   onCastOnWand: (details: SpellDetails | null) => void;
   onCastOnBox: (details: SpellDetails | null) => void;
   isWandConnected: boolean;
   isBoxConnected: boolean;
-}> = ({ spellDetails, isLoading, error, onCastOnWand, onCastOnBox, isWandConnected, isBoxConnected }) => {
-    if (isLoading) {
-        return <div className="text-center flex flex-col items-center justify-center h-full"><SpinnerIcon /> <p className="mt-2">Consulting the magical archives...</p></div>;
-    }
-    if (error) {
-        return <div className="text-center flex flex-col items-center justify-center h-full text-red-400"><ExclamationCircleIcon /> <p className="mt-2">{error}</p></div>;
-    }
+}> = ({ spellDetails, onCastOnWand, onCastOnBox, isWandConnected, isBoxConnected }) => {
     if (!spellDetails) {
         return <div className="text-center flex flex-col items-center justify-center h-full text-slate-500"><p>Cast a spell with your wand to see its details here.</p></div>;
     }
@@ -594,8 +588,6 @@ const ControlHub: React.FC<{
   gestureState: GestureState;
   clientSideGestureDetected: boolean;
   spellDetails: SpellDetails | null;
-  isFetchingSpellDetails: boolean;
-  spellDetailsError: string | null;
   vfxSequence: VfxCommand[];
   addVfxCommand: (type: VfxCommandType) => void;
   updateVfxCommand: (id: number, params: any) => void;
@@ -610,7 +602,7 @@ const ControlHub: React.FC<{
   onCastOnBox: (details: SpellDetails | null) => void;
   castingHistory: CastingHistoryEntry[];
 }> = ({
-  lastSpell, gestureState, clientSideGestureDetected, spellDetails, isFetchingSpellDetails, spellDetailsError,
+  lastSpell, gestureState, clientSideGestureDetected, spellDetails,
   vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved,
   wandConnectionState, boxConnectionState, liveEvent, onCastOnWand, onCastOnBox, castingHistory
 }) => {
@@ -655,8 +647,6 @@ const ControlHub: React.FC<{
                 <div className="flex-grow min-h-0">
                     <SpellDetailsCard 
                         spellDetails={spellDetails}
-                        isLoading={isFetchingSpellDetails}
-                        error={spellDetailsError}
                         onCastOnWand={onCastOnWand}
                         onCastOnBox={onCastOnBox}
                         isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
@@ -687,7 +677,6 @@ const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
-const LOCAL_STORAGE_KEY_SPELL_CACHE = 'magicWandSpellCache';
 
 
 // --- IMU Data Parsing ---
@@ -935,11 +924,6 @@ interface DiagnosticsProps {
   handleImuCalibrate: () => void;
   latestImuData: IMUReading[] | null;
   buttonState: [boolean, boolean, boolean, boolean];
-  smaliInput: string;
-  setSmaliInput: (input: string) => void;
-  analyzeSmaliWithGemini: () => void;
-  isAnalyzingSmali: boolean;
-  smaliAnalysis: string;
   isClientSideGestureDetectionEnabled: boolean;
   setIsClientSideGestureDetectionEnabled: (enabled: boolean) => void;
   gestureThreshold: number;
@@ -953,8 +937,7 @@ interface DiagnosticsProps {
 
 const Diagnostics: React.FC<DiagnosticsProps> = ({
   detectedOpCodes, rawPacketLog, bleEventLog, isImuStreaming, toggleImuStream, handleImuCalibrate,
-  latestImuData, buttonState, smaliInput, setSmaliInput, analyzeSmaliWithGemini, isAnalyzingSmali,
-  smaliAnalysis, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled,
+  latestImuData, buttonState, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled,
   gestureThreshold, setGestureThreshold, clientSideGestureDetected, buttonThresholds, handleReadButtonThresholds,
   wandConnectionState, queueCommand
 }) => {
@@ -1034,13 +1017,6 @@ const Diagnostics: React.FC<DiagnosticsProps> = ({
                              <button onClick={() => queueCommand(WBDLPayloads.MACRO_READY_TO_CAST_CMD)} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Ready FX</button>
                              <button onClick={() => queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD)} disabled={!isConnected} className="px-2 py-2 text-xs bg-slate-600 hover:bg-slate-500 rounded disabled:bg-slate-500">Req Firmware</button>
                          </div>
-                    </div>
-                    {/* Smali Analysis Panel */}
-                    <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex-grow flex flex-col">
-                         <h4 className="text-lg font-semibold mb-2">Smali Analyzer (via Gemini)</h4>
-                         <textarea value={smaliInput} onChange={e => setSmaliInput(e.target.value)} placeholder="Paste smali code here..." rows={4} className="w-full bg-slate-950 border border-slate-600 rounded-lg p-2 text-xs font-mono"></textarea>
-                         <button onClick={analyzeSmaliWithGemini} disabled={isAnalyzingSmali} className="mt-2 w-full px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 rounded disabled:bg-slate-500">{isAnalyzingSmali ? 'Analyzing...' : 'Analyze'}</button>
-                         <div className="mt-2 p-2 bg-slate-950 rounded border border-slate-600 flex-grow overflow-y-auto text-sm prose prose-invert prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: smaliAnalysis || '<p class="text-slate-500">Analysis results will appear here.</p>' }}></div>
                     </div>
                 </div>
 
@@ -1256,8 +1232,6 @@ export default function App() {
   // General State
   const [lastSpell, setLastSpell] = React.useState<{ name: string } | null>(null);
   const [spellDetails, setSpellDetails] = React.useState<SpellDetails | null>(null);
-  const [isFetchingSpellDetails, setIsFetchingSpellDetails] = React.useState(false);
-  const [spellDetailsError, setSpellDetailsError] = React.useState<string | null>(null);
   const [gestureState, setGestureState] = React.useState<GestureState>('Idle');
   const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter' | 'wizarding_class'>('device_manager');
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
@@ -1293,9 +1267,6 @@ export default function App() {
   // Diagnostics State
   const [bleEventLog, setBleEventLog] = React.useState<BleEvent[]>([]);
   const [negotiatedMtu, setNegotiatedMtu] = React.useState<number>(WBDLPayloads.MTU_PAYLOAD_SIZE);
-  const [smaliInput, setSmaliInput] = React.useState('');
-  const [smaliAnalysis, setSmaliAnalysis] = React.useState('');
-  const [isAnalyzingSmali, setIsAnalyzingSmali] = React.useState(false);
   // New: State for Client-Side Gesture Detection, based on n.smali analysis
   const [isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled] = React.useState(true);
   const [gestureThreshold, setGestureThreshold] = React.useState(2.0); // Default threshold in G's
@@ -1309,8 +1280,6 @@ export default function App() {
   const [isCompendiumModalOpen, setIsCompendiumModalOpen] = React.useState(false);
   const [selectedCompendiumSpell, setSelectedCompendiumSpell] = React.useState<string | null>(null);
   const [compendiumSpellDetails, setCompendiumSpellDetails] = React.useState<SpellDetails | null>(null);
-  const [isFetchingCompendiumDetails, setIsFetchingCompendiumDetails] = React.useState(false);
-  const [compendiumError, setCompendiumError] = React.useState<string | null>(null);
 
   // New: State for Protocol Settings
   const [commandDelay_ms, setCommandDelay_ms] = React.useState(20);
@@ -1320,10 +1289,6 @@ export default function App() {
 
   // New: State for Live Event Indicator, based on SpellGestureHandler.smali analysis
   const [liveEvent, setLiveEvent] = React.useState<LiveEvent>(null);
-
-  // New: State for caching spell details from Gemini API
-  const [spellDetailsCache, setSpellDetailsCache] = React.useState<Record<string, SpellDetails>>({});
-
 
   // --- Command Queue State ---
   const [writeQueue, setWriteQueue] = React.useState<WriteQueueItem[]>([]);
@@ -1417,22 +1382,6 @@ export default function App() {
         localStorage.removeItem(LOCAL_STORAGE_KEY_CASTING_HISTORY);
     }
 
-    // New: Load Spell Details Cache
-    try {
-      const savedCacheJSON = localStorage.getItem(LOCAL_STORAGE_KEY_SPELL_CACHE);
-      if (savedCacheJSON) {
-        const savedCache: Record<string, SpellDetails> = JSON.parse(savedCacheJSON);
-        if (typeof savedCache === 'object' && savedCache !== null) {
-          setSpellDetailsCache(savedCache);
-          addLog('INFO', 'Loaded spell details cache from storage.');
-        }
-      }
-    } catch (error) {
-      addLog('ERROR', `Failed to load spell cache: ${String(error)}`);
-      localStorage.removeItem(LOCAL_STORAGE_KEY_SPELL_CACHE);
-    }
-
-
     // Load TV Broadcast settings
     try {
       const savedEnabled = localStorage.getItem('magicWandTvBroadcastEnabled');
@@ -1506,20 +1455,6 @@ export default function App() {
       }
   }, [castingHistory, addLog]);
 
-  // New: Effect to save Spell Details Cache when it changes
-  const isInitialMountCache = React.useRef(true);
-  React.useEffect(() => {
-    if (isInitialMountCache.current) {
-        isInitialMountCache.current = false;
-        return;
-    }
-    try {
-        localStorage.setItem(LOCAL_STORAGE_KEY_SPELL_CACHE, JSON.stringify(spellDetailsCache));
-    } catch (error) {
-        addLog('ERROR', `Failed to save spell cache: ${String(error)}`);
-    }
-  }, [spellDetailsCache, addLog]);
-
   // Effect to save TV Broadcast settings
   React.useEffect(() => {
     try {
@@ -1560,111 +1495,20 @@ export default function App() {
     }
   }, [wandConnectionState, boxConnectionState, isScannerOpen, deviceToScan]);
 
-  const macroSchema = {
-    type: Type.ARRAY,
-    description: "A list of command groups. Each group is a list of command objects to be executed in sequence for the device's VFX.",
-    items: {
-        type: Type.ARRAY,
-        items: {
-            type: Type.OBJECT,
-            properties: {
-                command: {
-                    type: Type.STRING,
-                    description: "Command name. Must be one of: 'LightTransition', 'HapticBuzz', 'MacroDelay', 'LightClear'."
-                },
-                color: { type: Type.STRING, description: "Hex color (#RRGGBB) for 'LightTransition'." },
-                duration: { type: Type.INTEGER, description: "Duration in milliseconds for 'LightTransition', 'HapticBuzz', and 'MacroDelay'." },
-                group: { type: Type.INTEGER, description: "LED group to target for 'LightTransition'. Usually 0." },
-                loops: { type: Type.INTEGER, description: "Number of times to repeat this command. Defaults to 1." }
-            },
-            required: ["command"]
-        }
-    }
-  };
-
-
-  const fetchSpellDetails = React.useCallback(async (spellName: string) => {
-    if (!spellName) return;
-
-    const cachedDetails = spellDetailsCache[spellName];
-    if (cachedDetails) {
-        addLog('INFO', `Loading spell details for ${spellName} from cache.`);
-        setSpellDetails(cachedDetails);
-        return;
-    }
-
-    setIsFetchingSpellDetails(true);
-    setSpellDetailsError(null);
-    setSpellDetails(null);
-    addLog('INFO', `Fetching details for spell: ${spellName}...`);
-
-    try {
-      const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-      
-      const responseSchema = {
-          type: Type.OBJECT,
-          properties: {
-              spell_name: { type: Type.STRING },
-              incantation_name: { type: Type.STRING, description: "The incantation, which may be the same as the name or slightly different (e.g., 'Wingardium Leviosa')." },
-              description: { type: Type.STRING, description: "A brief, one-sentence description of the spell's effect." },
-              spell_type: { type: Type.STRING, description: "The category of the spell (e.g., Charm, Jinx, Hex, Transfiguration, Curse)." },
-              difficulty: { type: Type.INTEGER, description: "A rating from 1 (easy) to 5 (very difficult)." },
-              spell_background_color: { type: Type.STRING, description: "A hex color code (e.g., '#2A3B4C') representing the spell's theme color." },
-              spell_uses: {
-                  type: Type.ARRAY,
-                  description: "A list of 2-3 objects representing common applications of the spell. Each object should have an 'id', 'name', and 'icon' property. 'icon' should be a simple descriptive noun (e.g., 'combat', 'utility', 'charm').",
-                  items: {
-                      type: Type.OBJECT,
-                      properties: {
-                          id: { type: Type.STRING, description: "A unique identifier for the spell use, e.g., 'unlocking_doors'." },
-                          name: { type: Type.STRING, description: "A short description of the use, e.g., 'Unlocks simple doors and windows'." },
-                          icon: { type: Type.STRING, description: "A simple, single-word noun describing the use category, e.g., 'utility'." }
-                      },
-                      required: ["id", "name", "icon"]
-                  }
-              },
-              config_wand: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-              config_wandbox: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-          },
-          required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "config_wand", "config_wandbox"]
-      };
-
-      const systemInstruction = `You are a magical archivist providing data about spells from a wizarding world. For a given spell name, you must return a single, valid JSON object with details about that spell, conforming to the provided schema. The 'spell_name' in the response should be the same as the input spell name, formatted in uppercase. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `Provide the details for the spell: "${spellName}".`,
-        config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-        },
-      });
-
-      const jsonText = response.text;
-      const details = JSON.parse(jsonText) as SpellDetails;
-      setSpellDetails(details);
-      setSpellDetailsCache(prevCache => ({...prevCache, [spellName]: details}));
-      addLog('SUCCESS', `Successfully fetched details for ${spellName}.`);
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      addLog('ERROR', `Failed to fetch spell details: ${errorMessage}`);
-      setSpellDetailsError('Could not retrieve spell details from the magical archives.');
-    } finally {
-      setIsFetchingSpellDetails(false);
-    }
-  }, [addLog, spellDetailsCache]);
-
   React.useEffect(() => {
     if (lastSpell?.name) {
-      fetchSpellDetails(lastSpell.name);
+      const details = SPELL_DETAILS_DATA[lastSpell.name.toUpperCase()];
+      if (details) {
+        setSpellDetails(details);
+        addLog('SUCCESS', `Looked up local details for ${lastSpell.name}.`);
+      } else {
+        setSpellDetails(null);
+        addLog('WARNING', `No local spell details found for ${lastSpell.name}.`);
+      }
     } else {
       setSpellDetails(null);
-      setSpellDetailsError(null);
-      setIsFetchingSpellDetails(false);
     }
-  }, [lastSpell, fetchSpellDetails]);
+  }, [lastSpell, addLog]);
 
 
   const clearKeepAlive = React.useCallback(() => {
@@ -2048,8 +1892,8 @@ export default function App() {
         return; 
     }
     
-    const canonicalSpellName = spellName.toUpperCase();
-    const macros_payoff = SPELL_BOX_REACTIONS[canonicalSpellName];
+    const details = SPELL_DETAILS_DATA[spellName.toUpperCase()];
+    const macros_payoff = details?.config_wandbox?.macros_payoff;
 
     if (!macros_payoff || macros_payoff.length === 0) {
         addLog('INFO', `No local box reaction macro found for spell ${spellName}.`);
@@ -2521,6 +2365,7 @@ export default function App() {
       addLog('SUCCESS', 'Wand connection fully established!');
 
       // Post-connection setup
+      queueCommand(WBDLPayloads.WAND_CONNECTION_SUCCESS_CMD); // Add connection feedback effect
       queueCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
       queueCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
       
@@ -2616,6 +2461,7 @@ export default function App() {
       
       // New: Request info from the box, as confirmed by smali analysis of WandBoxHelper's `subscribeToBoxInfo`
       addLog('INFO', 'Requesting firmware and product info from Wand Box...');
+      queueBoxCommand(WBDLPayloads.BOX_CONNECTION_SUCCESS_CMD); // Add connection feedback effect
       queueBoxCommand(WBDLPayloads.FIRMWARE_REQUEST_CMD);
       queueBoxCommand(WBDLPayloads.PRODUCT_INFO_REQUEST_CMD);
 
@@ -2816,50 +2662,6 @@ export default function App() {
       }
   }, [wandDetails?.wandType, sendButtonThresholds]);
 
-
-  const analyzeSmaliWithGemini = async () => {
-    if (!smaliInput.trim()) {
-      addLog('WARNING', 'Smali input is empty.');
-      return;
-    }
-    setIsAnalyzingSmali(true);
-    setSmaliAnalysis('');
-    addLog('INFO', 'Analyzing smali with Gemini...');
-
-    try {
-        const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-        const systemInstruction = `You are an expert reverse engineer specializing in Android smali code, specifically for Bluetooth Low Energy (BLE) protocols. Analyze the provided smali code snippet from a BLE-related application. Your analysis should focus on identifying key information relevant to the BLE protocol.
-
-Your response should be a concise summary in markdown format.
-
-Focus on identifying and explaining:
-- **Service and Characteristic UUIDs:** List any found UUIDs and their likely purpose (e.g., "Main control service," "Notification characteristic").
-- **Opcodes:** Identify any byte constants used as command identifiers (opcodes).
-- **Packet Structures:** Describe the format of any data packets being constructed or parsed.
-- **Protocol Logic:** Explain the sequence of operations or any interesting logic (e.g., "Sends opcode 0x50, then a 2-byte duration").
-- **Key Constants:** Point out any important numerical or string constants and their meaning in the protocol.
-
-Be precise and base your conclusions directly on the provided code.`;
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-pro',
-            contents: `Analyze this smali code:\n\n\`\`\`smali\n${smaliInput}\n\`\`\``,
-            config: {
-                systemInstruction: systemInstruction,
-            },
-        });
-        
-        setSmaliAnalysis(response.text);
-        addLog('SUCCESS', 'Smali analysis complete.');
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        addLog('ERROR', `Smali analysis failed: ${errorMessage}`);
-        setSmaliAnalysis(`**Error:** Could not analyze the smali code. ${errorMessage}`);
-    } finally {
-        setIsAnalyzingSmali(false);
-    }
-  };
-
   const startBleExplorerScan = React.useCallback(async () => {
       if (!navigator.bluetooth) {
           addLog('ERROR', 'Web Bluetooth is not available.');
@@ -2955,79 +2757,17 @@ Be precise and base your conclusions directly on the provided code.`;
     sendMacroSequence(macroVariation, 'box');
   }, [addLog, boxConnectionState, sendMacroSequence]);
 
-
-  const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
-    if (!spellName) return;
-    
-    const cachedDetails = spellDetailsCache[spellName];
-    if (cachedDetails) {
-        addLog('INFO', `Compendium: Loading spell details for ${spellName} from cache.`);
-        setCompendiumSpellDetails(cachedDetails);
-        return;
+  const handleSelectCompendiumSpell = (spellName: string) => {
+    const details = SPELL_DETAILS_DATA[spellName.toUpperCase()];
+    if (details) {
+        setCompendiumSpellDetails(details);
+        setSelectedCompendiumSpell(spellName);
+        setIsCompendiumModalOpen(true);
+    } else {
+        addLog('WARNING', `No local details found for compendium spell: ${spellName}`);
     }
+  };
 
-    setIsFetchingCompendiumDetails(true);
-    setCompendiumError(null);
-    setCompendiumSpellDetails(null);
-    addLog('INFO', `Compendium: Fetching details for ${spellName}...`);
-    try {
-       const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-       
-       const responseSchema = {
-           type: Type.OBJECT,
-           properties: {
-                spell_name: { type: Type.STRING },
-                incantation_name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                spell_type: { type: Type.STRING },
-                difficulty: { type: Type.INTEGER },
-                spell_background_color: { type: Type.STRING },
-                spell_uses: { type: Type.ARRAY, items: {
-                    type: Type.OBJECT, properties: {
-                        id: { type: Type.STRING },
-                        name: { type: Type.STRING },
-                        icon: { type: Type.STRING }
-                    }, required: ["id", "name", "icon"]
-                }},
-                config_wand: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-                config_wandbox: { type: Type.OBJECT, properties: { macros_payoff: macroSchema } },
-           },
-           required: ["spell_name", "incantation_name", "description", "spell_type", "difficulty", "spell_background_color", "spell_uses", "config_wand", "config_wandbox"]
-       };
-
-      const systemInstruction = `You are a magical archivist. Based on the provided spell name, return a complete JSON object representing the spell's data, conforming to the schema. You must generate plausible 'macros_payoff' sequences for both 'config_wand' and 'config_wandbox'. Remember, \`macros_payoff\` is a list of variations (a list of lists of commands). To make the spell effects more dynamic, please generate between 1 and 3 distinct variations for each spell. The wand's effect should be direct and active (e.g., quick flashes, haptics). The wand box's effect should be more ambient and secondary (e.g., a slow glow, a color shift).`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-pro",
-        contents: `Provide the full spell data object for: "${spellName}".`,
-        config: {
-          systemInstruction: systemInstruction,
-          responseMimeType: "application/json",
-          responseSchema: responseSchema,
-        },
-      });
-
-      const jsonText = response.text;
-      const details = JSON.parse(jsonText) as SpellDetails;
-      setCompendiumSpellDetails(details);
-      setSpellDetailsCache(prevCache => ({...prevCache, [spellName]: details}));
-      addLog('SUCCESS', `Compendium: Successfully fetched details for ${spellName}.`);
-
-    } catch (error) {
-       const errorMessage = error instanceof Error ? error.message : String(error);
-       setCompendiumError(`Failed to fetch compendium data: ${errorMessage}`);
-       addLog('ERROR', `Compendium: ${errorMessage}`);
-    } finally {
-        setIsFetchingCompendiumDetails(false);
-    }
-  }, [addLog, spellDetailsCache]);
-
-  React.useEffect(() => {
-    if (selectedCompendiumSpell) {
-        fetchCompendiumDetails(selectedCompendiumSpell);
-    }
-  }, [selectedCompendiumSpell, fetchCompendiumDetails]);
-  
   const handleFinishTutorial = React.useCallback(() => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY_TUTORIAL, 'true');
@@ -3094,8 +2834,6 @@ Be precise and base your conclusions directly on the provided code.`;
         gestureState={gestureState} 
         clientSideGestureDetected={clientSideGestureDetected}
         spellDetails={spellDetails}
-        isFetchingSpellDetails={isFetchingSpellDetails}
-        spellDetailsError={spellDetailsError}
         vfxSequence={vfxSequence}
         addVfxCommand={addVfxCommand}
         updateVfxCommand={updateVfxCommand}
@@ -3152,11 +2890,6 @@ Be precise and base your conclusions directly on the provided code.`;
         handleImuCalibrate={handleImuCalibrate}
         latestImuData={latestImuData}
         buttonState={buttonState}
-        smaliInput={smaliInput}
-        setSmaliInput={setSmaliInput}
-        analyzeSmaliWithGemini={analyzeSmaliWithGemini}
-        isAnalyzingSmali={isAnalyzingSmali}
-        smaliAnalysis={smaliAnalysis}
         isClientSideGestureDetectionEnabled={isClientSideGestureDetectionEnabled}
         setIsClientSideGestureDetectionEnabled={setIsClientSideGestureDetectionEnabled}
         gestureThreshold={gestureThreshold}
@@ -3170,10 +2903,7 @@ Be precise and base your conclusions directly on the provided code.`;
       case 'compendium': return <SpellCompendium
           spellBook={spellBook}
           castingHistory={castingHistory}
-          onSelectSpell={(spell) => {
-              setSelectedCompendiumSpell(spell);
-              setIsCompendiumModalOpen(true);
-          }}
+          onSelectSpell={handleSelectCompendiumSpell}
           onUnlockAll={handleUnlockAllSpells}
       />;
       case 'explorer': return <BleExplorer 
@@ -3227,11 +2957,9 @@ Be precise and base your conclusions directly on the provided code.`;
       )}
       
       {isCompendiumModalOpen && selectedCompendiumSpell && (
-        <Modal title={`Spell Compendium: ${selectedCompendiumSpell}`} onClose={() => { setIsCompendiumModalOpen(false); setSelectedCompendiumSpell(null); }}>
+        <Modal title={`Spell Compendium: ${selectedCompendiumSpell.replace(/_/g, ' ')}`} onClose={() => { setIsCompendiumModalOpen(false); setSelectedCompendiumSpell(null); }}>
           <SpellDetailsCard 
               spellDetails={compendiumSpellDetails}
-              isLoading={isFetchingCompendiumDetails}
-              error={compendiumError}
               onCastOnWand={castSpellOnWand}
               onCastOnBox={reactToSpellOnBoxFromUI}
               isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
