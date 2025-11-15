@@ -1,8 +1,11 @@
 
 
+
+
+
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
-import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS } from './constants';
+import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_BOX_REACTIONS } from './constants';
 // FIX: Added RawPacket to the import list from types.ts.
 import { WandTypes, RawPacket, ConnectionState } from './types';
 import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
@@ -1248,7 +1251,7 @@ export default function App() {
   const [buttonState, setButtonState] = React.useState<[boolean, boolean, boolean, boolean]>([false, false, false, false]);
   
   // General State
-  const [lastSpell, setLastSpell] = React.useState<{ name: string; isLive: boolean } | null>(null);
+  const [lastSpell, setLastSpell] = React.useState<{ name: string } | null>(null);
   const [spellDetails, setSpellDetails] = React.useState<SpellDetails | null>(null);
   const [isFetchingSpellDetails, setIsFetchingSpellDetails] = React.useState(false);
   const [spellDetailsError, setSpellDetailsError] = React.useState<string | null>(null);
@@ -1914,6 +1917,113 @@ export default function App() {
       }
   }, [addLog]);
 
+  // FIX: Moved `sendMacroSequence` before its first use to resolve a "used before its declaration" error.
+  const sendMacroSequence = React.useCallback((commands: MacroCommand[], target: 'wand' | 'box') => {
+    const isWand = target === 'wand';
+    const connectionState = isWand ? wandConnectionState : boxConnectionState;
+    const char = isWand ? commandCharacteristic.current : boxCommandCharacteristic.current;
+    const queueFn = isWand ? queueCommand : queueBoxCommand;
+    const mtu = isWand ? negotiatedMtu : WBDLPayloads.MTU_PAYLOAD_SIZE;
+    const deviceName = isWand ? "Wand" : "Wand Box";
+
+    if (connectionState !== ConnectionState.CONNECTED || !char) {
+        addLog('ERROR', `Cannot send macro sequence: ${deviceName} not connected.`);
+        return;
+    }
+
+    addLog('INFO', `Building and sending VFX macro sequence to ${deviceName}...`);
+    // Assumption: The box uses the same MACRO_EXECUTE command prefix as the wand.
+    const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
+    let hasError = false;
+
+    commands.forEach(cmd => {
+        if (hasError) return;
+        
+        const loops = cmd.loops ?? 1;
+        for (let i = 0; i < loops; i++) {
+            switch (cmd.command) {
+                case 'LightClear':
+                    payload.push(WBDLProtocol.INST.MACRO_LIGHT_CLEAR);
+                    break;
+                case 'HapticBuzz': {
+                    const duration = cmd.duration ?? 100;
+                    payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
+                    break;
+                }
+                case 'MacroDelay': {
+                    const duration = cmd.duration ?? 100;
+                    payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
+                    break;
+                }
+                case 'LightTransition': {
+                    const hex = cmd.color ?? '#ffffff';
+                    const mode = cmd.group ?? 0; // 'group' in MacroCommand maps to 'mode'
+                    const duration = cmd.duration ?? 1000;
+                    
+                    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                        addLog('ERROR', `Invalid hex color "${hex}" in macro command. Aborting sequence.`);
+                        hasError = true;
+                        return;
+                    }
+
+                    const r = parseInt(hex.substring(1, 3), 16);
+                    const g = parseInt(hex.substring(3, 5), 16);
+                    const b = parseInt(hex.substring(5, 7), 16);
+                    
+                    payload.push(
+                        WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
+                        mode, r, g, b,
+                        duration & 0xFF, (duration >> 8) & 0xFF
+                    );
+                    break;
+                }
+                default:
+                    addLog('WARNING', `Unknown command in macro sequence: ${cmd.command}`);
+                    break;
+            }
+        }
+    });
+
+    if (hasError) return;
+
+    const finalPayload = new Uint8Array(payload);
+    
+    if (finalPayload.length > mtu) {
+        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${mtu} bytes) for ${deviceName}. Splitting into chunks.`);
+        for (let i = 0; i < finalPayload.length; i += mtu) {
+            const chunk = finalPayload.slice(i, i + negotiatedMtu);
+            queueFn(chunk);
+        }
+    } else {
+        queueFn(finalPayload);
+    }
+  }, [wandConnectionState, boxConnectionState, queueCommand, queueBoxCommand, negotiatedMtu, addLog]);
+
+  const reactToSpellOnBoxFromWand = React.useCallback((spellName: string) => {
+    if (boxConnectionState !== ConnectionState.CONNECTED) {
+        return; 
+    }
+    
+    const canonicalSpellName = spellName.toUpperCase();
+    const macros_payoff = SPELL_BOX_REACTIONS[canonicalSpellName];
+
+    if (!macros_payoff || macros_payoff.length === 0) {
+        addLog('INFO', `No local box reaction macro found for spell ${spellName}.`);
+        return;
+    }
+
+    const deviceType = 'BOX';
+
+    const currentIndex = macroIndexes.current[deviceType] ?? -1;
+    const nextIndex = (currentIndex + 1) % macros_payoff.length;
+    macroIndexes.current[deviceType] = nextIndex;
+    const macroVariation = macros_payoff[nextIndex];
+
+    addLog('INFO', `Activating local box reaction for '${spellName}'. Executing macro variation ${nextIndex + 1}/${macros_payoff.length}.`);
+
+    sendMacroSequence(macroVariation, 'box');
+  }, [addLog, boxConnectionState, sendMacroSequence]);
+
   const parseStreamData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     addBleEvent('Event', `characteristicvaluechanged (Stream: ${target.uuid.substring(4, 8)})`);
@@ -2066,7 +2176,11 @@ export default function App() {
 
           addLog('SUCCESS', `SPELL DETECTED: *** ${finalSpellName} *** (Raw: "${cleanedSpellName}", Header: ${headerHex})`);
           
-          setLastSpell({ name: finalSpellName, isLive: true });
+          setLastSpell({ name: finalSpellName });
+          if (boxConnectionState === ConnectionState.CONNECTED) {
+            reactToSpellOnBoxFromWand(finalSpellName);
+          }
+          
           setGestureState('Idle');
           
           sendTvBroadcast(finalSpellName);
@@ -2117,7 +2231,7 @@ export default function App() {
          }
       }
     }
-  }, [addLog, isImuStreaming, queueCommand, sendTvBroadcast, handleHueSpell, addBleEvent, isClientSideGestureDetectionEnabled, gestureState, clientSideGestureDetected, gestureThreshold]);
+  }, [addLog, isImuStreaming, queueCommand, sendTvBroadcast, handleHueSpell, addBleEvent, isClientSideGestureDetectionEnabled, gestureState, clientSideGestureDetected, gestureThreshold, boxConnectionState, reactToSpellOnBoxFromWand]);
   
   const parseControlData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
@@ -2748,87 +2862,6 @@ Be precise and base your conclusions directly on the provided code.`;
       }
   }, [addLog]);
   
-  const sendMacroSequence = React.useCallback((commands: MacroCommand[], target: 'wand' | 'box') => {
-    const isWand = target === 'wand';
-    const connectionState = isWand ? wandConnectionState : boxConnectionState;
-    const char = isWand ? commandCharacteristic.current : boxCommandCharacteristic.current;
-    const queueFn = isWand ? queueCommand : queueBoxCommand;
-    const mtu = isWand ? negotiatedMtu : WBDLPayloads.MTU_PAYLOAD_SIZE;
-    const deviceName = isWand ? "Wand" : "Wand Box";
-
-    if (connectionState !== ConnectionState.CONNECTED || !char) {
-        addLog('ERROR', `Cannot send macro sequence: ${deviceName} not connected.`);
-        return;
-    }
-
-    addLog('INFO', `Building and sending VFX macro sequence to ${deviceName}...`);
-    // Assumption: The box uses the same MACRO_EXECUTE command prefix as the wand.
-    const payload: number[] = [WBDLProtocol.CMD.MACRO_EXECUTE];
-    let hasError = false;
-
-    commands.forEach(cmd => {
-        if (hasError) return;
-        
-        const loops = cmd.loops ?? 1;
-        for (let i = 0; i < loops; i++) {
-            switch (cmd.command) {
-                case 'LightClear':
-                    payload.push(WBDLProtocol.INST.MACRO_LIGHT_CLEAR);
-                    break;
-                case 'HapticBuzz': {
-                    const duration = cmd.duration ?? 100;
-                    payload.push(WBDLProtocol.CMD.HAPTIC_VIBRATE, duration & 0xFF, (duration >> 8) & 0xFF);
-                    break;
-                }
-                case 'MacroDelay': {
-                    const duration = cmd.duration ?? 100;
-                    payload.push(WBDLProtocol.INST.MACRO_DELAY, duration & 0xFF, (duration >> 8) & 0xFF);
-                    break;
-                }
-                case 'LightTransition': {
-                    const hex = cmd.color ?? '#ffffff';
-                    const mode = cmd.group ?? 0; // 'group' in MacroCommand maps to 'mode'
-                    const duration = cmd.duration ?? 1000;
-                    
-                    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) {
-                        addLog('ERROR', `Invalid hex color "${hex}" in macro command. Aborting sequence.`);
-                        hasError = true;
-                        return;
-                    }
-
-                    const r = parseInt(hex.substring(1, 3), 16);
-                    const g = parseInt(hex.substring(3, 5), 16);
-                    const b = parseInt(hex.substring(5, 7), 16);
-                    
-                    payload.push(
-                        WBDLProtocol.INST.MACRO_LIGHT_TRANSITION,
-                        mode, r, g, b,
-                        duration & 0xFF, (duration >> 8) & 0xFF
-                    );
-                    break;
-                }
-                default:
-                    addLog('WARNING', `Unknown command in macro sequence: ${cmd.command}`);
-                    break;
-            }
-        }
-    });
-
-    if (hasError) return;
-
-    const finalPayload = new Uint8Array(payload);
-    
-    if (finalPayload.length > mtu) {
-        addLog('INFO', `Macro size (${finalPayload.length} bytes) exceeds MTU (${mtu} bytes) for ${deviceName}. Splitting into chunks.`);
-        for (let i = 0; i < finalPayload.length; i += mtu) {
-            const chunk = finalPayload.slice(i, i + negotiatedMtu);
-            queueFn(chunk);
-        }
-    } else {
-        queueFn(finalPayload);
-    }
-  }, [wandConnectionState, boxConnectionState, queueCommand, queueBoxCommand, negotiatedMtu, addLog]);
-  
   const castSpellOnWand = React.useCallback((spellDetails: SpellDetails | null) => {
     if (wandConnectionState !== ConnectionState.CONNECTED) {
         addLog('ERROR', 'Wand not connected.');
@@ -2855,7 +2888,7 @@ Be precise and base your conclusions directly on the provided code.`;
   // This function acts as the `reactToSpell` method for the "WandBoxHelper".
   // It uses the "spellMacroHelper" logic to select and send a predefined
   // sequence of commands to the box in reaction to a spell.
-  const reactToSpellOnBox = React.useCallback((spellDetails: SpellDetails | null) => {
+  const reactToSpellOnBoxFromUI = React.useCallback((spellDetails: SpellDetails | null) => {
     if (boxConnectionState !== ConnectionState.CONNECTED) {
         addLog('ERROR', 'Wand Box not connected.');
         return;
@@ -2877,19 +2910,6 @@ Be precise and base your conclusions directly on the provided code.`;
 
     sendMacroSequence(macroVariation, 'box');
   }, [addLog, boxConnectionState, sendMacroSequence]);
-
-  React.useEffect(() => {
-    if (
-      spellDetails &&
-      lastSpell?.isLive &&
-      boxConnectionState === ConnectionState.CONNECTED &&
-      spellDetails.spell_name.toUpperCase().replace(/_/g, '') === lastSpell.name.toUpperCase().replace(/_/g, '')
-    ) {
-      addLog('INFO', `Wand cast detected. Triggering automatic reaction on Wand Box for "${spellDetails.spell_name}".`);
-      reactToSpellOnBox(spellDetails);
-      setLastSpell(prev => (prev ? { ...prev, isLive: false } : null));
-    }
-  }, [spellDetails, lastSpell, boxConnectionState, reactToSpellOnBox, addLog]);
 
 
   const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
@@ -3035,7 +3055,7 @@ Be precise and base your conclusions directly on the provided code.`;
         liveEvent={liveEvent}
         castingHistory={castingHistory}
         onCastOnWand={castSpellOnWand}
-        onCastOnBox={reactToSpellOnBox}
+        onCastOnBox={reactToSpellOnBoxFromUI}
       />;
       case 'device_manager': return <DeviceManager 
           wandConnectionState={wandConnectionState}
@@ -3160,7 +3180,7 @@ Be precise and base your conclusions directly on the provided code.`;
               isLoading={isFetchingCompendiumDetails}
               error={compendiumError}
               onCastOnWand={castSpellOnWand}
-              onCastOnBox={reactToSpellOnBox}
+              onCastOnBox={reactToSpellOnBoxFromUI}
               isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
               isBoxConnected={boxConnectionState === ConnectionState.CONNECTED}
           />

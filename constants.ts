@@ -1,6 +1,7 @@
 
 
-import { House, WandType } from './types';
+
+import { House, WandType, MacroCommand } from './types';
 
 // FIX: Corrected typo in 'GRYFFINDOR' and ensured all house names are strings.
 export const Houses: House[] = ['GRYFFINDOR', 'HUFFLEPUFF', 'RAVENCLAW', 'SLYTHERIN'];
@@ -141,6 +142,44 @@ export const WBDLPayloads = {
     ]),
     
     MTU_PAYLOAD_SIZE: 20,
+};
+
+// New: Local definitions for spell VFX on the Wand Box to avoid Gemini calls for reactions.
+export const SPELL_BOX_REACTIONS: Record<string, MacroCommand[][]> = {
+    LUMOS: [
+        [
+            { command: 'LightTransition', color: '#FFFFFF', duration: 1000, group: 0 },
+            { command: 'MacroDelay', duration: 3000 },
+            { command: 'LightTransition', color: '#000000', duration: 1000, group: 0 },
+        ]
+    ],
+    NOX: [
+        [
+            { command: 'LightTransition', color: '#000000', duration: 500, group: 0 },
+        ]
+    ],
+    INCENDIO: [
+        [
+            { command: 'LightTransition', color: '#FF4500', duration: 150, group: 0 },
+            { command: 'LightTransition', color: '#FF8C00', duration: 150, group: 0 },
+            { command: 'LightTransition', color: '#FF4500', duration: 150, group: 0 },
+            { command: 'LightTransition', color: '#FF8C00', duration: 150, group: 0, loops: 4 },
+            { command: 'LightTransition', color: '#000000', duration: 1000, group: 0 },
+        ]
+    ],
+    AGUAMENTI: [
+        [
+            { command: 'LightTransition', color: '#00BFFF', duration: 400, group: 0 },
+            { command: 'LightTransition', color: '#1E90FF', duration: 400, group: 0, loops: 2 },
+            { command: 'LightTransition', color: '#000000', duration: 1000, group: 0 },
+        ]
+    ],
+    WINGARDIUM_LEVIOSA: [
+        [
+            { command: 'LightTransition', color: '#E6E6FA', duration: 2000, group: 0 },
+            { command: 'LightTransition', color: '#000000', duration: 1500, group: 0 },
+        ]
+    ],
 };
 
 
