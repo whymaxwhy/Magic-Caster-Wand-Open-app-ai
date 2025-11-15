@@ -3,6 +3,8 @@
 
 
 
+
+
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_BOX_REACTIONS } from './constants';
@@ -685,6 +687,7 @@ const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
+const LOCAL_STORAGE_KEY_SPELL_CACHE = 'magicWandSpellCache';
 
 
 // --- IMU Data Parsing ---
@@ -1318,6 +1321,9 @@ export default function App() {
   // New: State for Live Event Indicator, based on SpellGestureHandler.smali analysis
   const [liveEvent, setLiveEvent] = React.useState<LiveEvent>(null);
 
+  // New: State for caching spell details from Gemini API
+  const [spellDetailsCache, setSpellDetailsCache] = React.useState<Record<string, SpellDetails>>({});
+
 
   // --- Command Queue State ---
   const [writeQueue, setWriteQueue] = React.useState<WriteQueueItem[]>([]);
@@ -1411,6 +1417,22 @@ export default function App() {
         localStorage.removeItem(LOCAL_STORAGE_KEY_CASTING_HISTORY);
     }
 
+    // New: Load Spell Details Cache
+    try {
+      const savedCacheJSON = localStorage.getItem(LOCAL_STORAGE_KEY_SPELL_CACHE);
+      if (savedCacheJSON) {
+        const savedCache: Record<string, SpellDetails> = JSON.parse(savedCacheJSON);
+        if (typeof savedCache === 'object' && savedCache !== null) {
+          setSpellDetailsCache(savedCache);
+          addLog('INFO', 'Loaded spell details cache from storage.');
+        }
+      }
+    } catch (error) {
+      addLog('ERROR', `Failed to load spell cache: ${String(error)}`);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_SPELL_CACHE);
+    }
+
+
     // Load TV Broadcast settings
     try {
       const savedEnabled = localStorage.getItem('magicWandTvBroadcastEnabled');
@@ -1484,6 +1506,20 @@ export default function App() {
       }
   }, [castingHistory, addLog]);
 
+  // New: Effect to save Spell Details Cache when it changes
+  const isInitialMountCache = React.useRef(true);
+  React.useEffect(() => {
+    if (isInitialMountCache.current) {
+        isInitialMountCache.current = false;
+        return;
+    }
+    try {
+        localStorage.setItem(LOCAL_STORAGE_KEY_SPELL_CACHE, JSON.stringify(spellDetailsCache));
+    } catch (error) {
+        addLog('ERROR', `Failed to save spell cache: ${String(error)}`);
+    }
+  }, [spellDetailsCache, addLog]);
+
   // Effect to save TV Broadcast settings
   React.useEffect(() => {
     try {
@@ -1550,6 +1586,13 @@ export default function App() {
   const fetchSpellDetails = React.useCallback(async (spellName: string) => {
     if (!spellName) return;
 
+    const cachedDetails = spellDetailsCache[spellName];
+    if (cachedDetails) {
+        addLog('INFO', `Loading spell details for ${spellName} from cache.`);
+        setSpellDetails(cachedDetails);
+        return;
+    }
+
     setIsFetchingSpellDetails(true);
     setSpellDetailsError(null);
     setSpellDetails(null);
@@ -1601,6 +1644,7 @@ export default function App() {
       const jsonText = response.text;
       const details = JSON.parse(jsonText) as SpellDetails;
       setSpellDetails(details);
+      setSpellDetailsCache(prevCache => ({...prevCache, [spellName]: details}));
       addLog('SUCCESS', `Successfully fetched details for ${spellName}.`);
 
     } catch (error) {
@@ -1610,7 +1654,7 @@ export default function App() {
     } finally {
       setIsFetchingSpellDetails(false);
     }
-  }, [addLog]);
+  }, [addLog, spellDetailsCache]);
 
   React.useEffect(() => {
     if (lastSpell?.name) {
@@ -2914,6 +2958,14 @@ Be precise and base your conclusions directly on the provided code.`;
 
   const fetchCompendiumDetails = React.useCallback(async (spellName: string) => {
     if (!spellName) return;
+    
+    const cachedDetails = spellDetailsCache[spellName];
+    if (cachedDetails) {
+        addLog('INFO', `Compendium: Loading spell details for ${spellName} from cache.`);
+        setCompendiumSpellDetails(cachedDetails);
+        return;
+    }
+
     setIsFetchingCompendiumDetails(true);
     setCompendiumError(null);
     setCompendiumSpellDetails(null);
@@ -2958,6 +3010,7 @@ Be precise and base your conclusions directly on the provided code.`;
       const jsonText = response.text;
       const details = JSON.parse(jsonText) as SpellDetails;
       setCompendiumSpellDetails(details);
+      setSpellDetailsCache(prevCache => ({...prevCache, [spellName]: details}));
       addLog('SUCCESS', `Compendium: Successfully fetched details for ${spellName}.`);
 
     } catch (error) {
@@ -2967,7 +3020,7 @@ Be precise and base your conclusions directly on the provided code.`;
     } finally {
         setIsFetchingCompendiumDetails(false);
     }
-  }, [addLog]);
+  }, [addLog, spellDetailsCache]);
 
   React.useEffect(() => {
     if (selectedCompendiumSpell) {
