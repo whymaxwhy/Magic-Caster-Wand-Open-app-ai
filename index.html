@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -36,6 +35,13 @@
        .toggle-checkbox {
         transition: transform 0.2s ease-in-out;
        }
+      @keyframes feedback-flash {
+        0% { opacity: 0.4; }
+        100% { opacity: 0; }
+      }
+      .animate-feedback-flash {
+        animation: feedback-flash 0.5s ease-out forwards;
+      }
 </style>
 </head>
   <body class="bg-slate-900 text-slate-200">

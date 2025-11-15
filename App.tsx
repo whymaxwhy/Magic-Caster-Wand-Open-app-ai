@@ -919,7 +919,33 @@ const SpellCompendium: React.FC<SpellCompendiumProps> = ({ spellBook, castingHis
     );
 };
 
-const Diagnostics: React.FC<any> = ({
+// FIX: Define a props interface for the Diagnostics component to avoid using `any` and fix type errors.
+interface DiagnosticsProps {
+  detectedOpCodes: Set<number>;
+  rawPacketLog: RawPacket[];
+  bleEventLog: BleEvent[];
+  isImuStreaming: boolean;
+  toggleImuStream: () => void;
+  handleImuCalibrate: () => void;
+  latestImuData: IMUReading[] | null;
+  buttonState: [boolean, boolean, boolean, boolean];
+  smaliInput: string;
+  setSmaliInput: (input: string) => void;
+  analyzeSmaliWithGemini: () => void;
+  isAnalyzingSmali: boolean;
+  smaliAnalysis: string;
+  isClientSideGestureDetectionEnabled: boolean;
+  setIsClientSideGestureDetectionEnabled: (enabled: boolean) => void;
+  gestureThreshold: number;
+  setGestureThreshold: (threshold: number) => void;
+  clientSideGestureDetected: boolean;
+  buttonThresholds: ButtonThresholds[];
+  handleReadButtonThresholds: () => void;
+  wandConnectionState: ConnectionState;
+  queueCommand: (payload: Uint8Array, silent?: boolean) => void;
+}
+
+const Diagnostics: React.FC<DiagnosticsProps> = ({
   detectedOpCodes, rawPacketLog, bleEventLog, isImuStreaming, toggleImuStream, handleImuCalibrate,
   latestImuData, buttonState, smaliInput, setSmaliInput, analyzeSmaliWithGemini, isAnalyzingSmali,
   smaliAnalysis, isClientSideGestureDetectionEnabled, setIsClientSideGestureDetectionEnabled,
@@ -1912,7 +1938,8 @@ export default function App() {
             if (isClientSideGestureDetectionEnabled && gestureState === 'Idle' && !clientSideGestureDetected) {
                 for (const reading of imuReadings) {
                     const { x, y, z } = reading.acceleration;
-                    const magnitude = Math.sqrt(x*x + y*y + z*z);
+                    // FIX: Changed multiplication to Math.pow to resolve a potential TypeScript type inference issue with the '*' operator.
+                    const magnitude = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
                     if (magnitude > gestureThreshold) {
                         setClientSideGestureDetected(true);
                         addLog('SUCCESS', `Client-side gesture detected! Accel magnitude: ${magnitude.toFixed(2)}g (Threshold: ${gestureThreshold}g)`);
@@ -3083,7 +3110,15 @@ Be precise and base your conclusions directly on the provided code.`;
           services={explorerServices}
       />;
       case 'scripter': return <Scripter addLog={addLog} />;
-      case 'wizarding_class': return <WizardingClass />;
+      case 'wizarding_class': return <WizardingClass 
+        isImuStreaming={isImuStreaming}
+        toggleImuStream={toggleImuStream}
+        latestImuData={latestImuData}
+        isWandConnected={wandConnectionState === ConnectionState.CONNECTED}
+        isBoxConnected={boxConnectionState === ConnectionState.CONNECTED}
+        queueCommand={queueCommand}
+        queueBoxCommand={queueBoxCommand}
+      />;
       default: return null;
     }
   }
