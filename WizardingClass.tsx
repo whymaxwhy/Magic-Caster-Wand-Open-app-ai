@@ -59,7 +59,7 @@ interface SpellChallenge {
 
 // --- DATA ---
 const initialChallenges: SpellChallenge[] = [
-  { id: 'lumos', name: 'Lumos', description: 'Creates a small, bright light at the tip of the wand.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 50 80 C 30 20, 70 20, 50 80' },
+  { id: 'lumos', name: 'Lumos', description: 'Creates a small, bright light at the tip of the wand.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 20 80 L 50 20 L 80 80' },
   { id: 'nox', name: 'Nox', description: 'Extinguishes the light created by Lumos.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 50 25 L 50 75' },
   { id: 'wingardium_leviosa', name: 'Wingardium Leviosa', description: 'Makes objects float in the air.', requiredLevel: 2, difficulty: 2, xpReward: 25, status: 'locked', gesturePath: 'M 20 70 Q 50 30, 80 70 L 80 80' },
   { id: 'alohomora', name: 'Alohomora', description: 'Unlocks doors and other locked objects.', requiredLevel: 3, difficulty: 2, xpReward: 30, status: 'locked', gesturePath: 'M 30 80 L 30 40 Q 50 20 70 40 L 70 50' },
@@ -72,7 +72,7 @@ const LEVEL_XP_BASE = 100;
 
 // --- GESTURE RECOGNITION HELPERS ---
 const GESTURE_SAMPLE_POINTS = 64;
-const SUCCESS_THRESHOLD = 20; // Lower is better match
+const SUCCESS_THRESHOLD = 30; // Lower is better match
 
 const distance = (p1: Point, p2: Point) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 

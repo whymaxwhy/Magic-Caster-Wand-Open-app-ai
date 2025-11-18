@@ -1,13 +1,4 @@
 
-
-
-
-
-
-
-
-
-
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_DETAILS_DATA } from './constants';
@@ -487,10 +478,12 @@ const VfxEditor: React.FC<{
   updateCommand: (id: number, params: any) => void;
   removeCommand: (id: number) => void;
   sendSequence: () => void;
-  saveSequence: () => void;
-  isSaved: boolean;
+  onSaveNewSequence: () => void;
   isConnected: boolean;
-}> = ({ sequence, addCommand, updateCommand, removeCommand, sendSequence, saveSequence, isSaved, isConnected }) => {
+  savedSequences: Record<string, VfxCommand[]>;
+  onLoadSequence: (name: string) => void;
+  onDeleteSequence: (name: string) => void;
+}> = ({ sequence, addCommand, updateCommand, removeCommand, sendSequence, onSaveNewSequence, isConnected, savedSequences, onLoadSequence, onDeleteSequence }) => {
     return (
         <div className="flex flex-col h-full bg-slate-900/50 p-4 rounded-lg border border-slate-700">
             <h3 className="text-xl font-semibold mb-2">VFX Macro Editor</h3>
@@ -511,12 +504,30 @@ const VfxEditor: React.FC<{
                     <button onClick={() => addCommand('LoopEnd')} className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded">+ Loop End</button>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={saveSequence} className={`flex-1 flex items-center justify-center px-4 py-2 rounded font-semibold text-sm ${isSaved ? 'bg-slate-600 text-slate-400' : 'bg-green-600 hover:bg-green-500'}`}>
-                        <SaveIcon /> {isSaved ? 'Saved' : 'Save'}
+                    <button onClick={onSaveNewSequence} className="flex-1 flex items-center justify-center px-4 py-2 rounded font-semibold text-sm bg-green-600 hover:bg-green-500">
+                        <SaveIcon /> Save as New...
                     </button>
                     <button onClick={sendSequence} disabled={!isConnected} className="flex-1 flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold disabled:bg-slate-500 disabled:cursor-not-allowed text-sm">
                         <MagicWandIcon /> Send to Wand
                     </button>
+                </div>
+                <div className="mt-4 pt-4 border-t border-slate-700">
+                    <h4 className="text-md font-semibold mb-2">Saved Macros</h4>
+                    <div className="max-h-32 overflow-y-auto pr-2 -mr-2 space-y-2">
+                        {Object.keys(savedSequences).length > 0 ? (
+                            Object.keys(savedSequences).map(name => (
+                                <div key={name} className="flex items-center justify-between bg-slate-800 p-2 rounded-md animate-fade-in">
+                                    <span className="text-sm font-medium">{name}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => onLoadSequence(name)} className="px-2 py-1 text-xs bg-slate-600 hover:bg-slate-500 rounded">Load</button>
+                                        <button onClick={() => onDeleteSequence(name)} className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-full"><TrashIcon /></button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-center text-slate-500 text-sm">No saved sequences.</p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -594,17 +605,20 @@ const ControlHub: React.FC<{
   removeVfxCommand: (id: number) => void;
   sendVfxSequence: () => void;
   saveVfxSequence: () => void;
-  isSequenceSaved: boolean;
   wandConnectionState: ConnectionState;
   boxConnectionState: ConnectionState;
   liveEvent: LiveEvent | null;
   onCastOnWand: (details: SpellDetails | null) => void;
   onCastOnBox: (details: SpellDetails | null) => void;
   castingHistory: CastingHistoryEntry[];
+  savedVfxSequences: Record<string, VfxCommand[]>;
+  loadVfxSequence: (name: string) => void;
+  deleteVfxSequence: (name: string) => void;
 }> = ({
   lastSpell, gestureState, clientSideGestureDetected, spellDetails,
-  vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence, isSequenceSaved,
-  wandConnectionState, boxConnectionState, liveEvent, onCastOnWand, onCastOnBox, castingHistory
+  vfxSequence, addVfxCommand, updateVfxCommand, removeVfxCommand, sendVfxSequence, saveVfxSequence,
+  wandConnectionState, boxConnectionState, liveEvent, onCastOnWand, onCastOnBox, castingHistory,
+  savedVfxSequences, loadVfxSequence, deleteVfxSequence
 }) => {
     const gestureStatus = () => {
         let text = 'Ready to Cast';
@@ -663,9 +677,11 @@ const ControlHub: React.FC<{
                     updateCommand={updateVfxCommand}
                     removeCommand={removeVfxCommand}
                     sendSequence={sendVfxSequence}
-                    saveSequence={saveVfxSequence}
-                    isSaved={isSequenceSaved}
+                    onSaveNewSequence={saveVfxSequence}
                     isConnected={wandConnectionState === ConnectionState.CONNECTED}
+                    savedSequences={savedVfxSequences}
+                    onLoadSequence={loadVfxSequence}
+                    onDeleteSequence={deleteVfxSequence}
                 />
             </div>
         </div>
@@ -673,7 +689,7 @@ const ControlHub: React.FC<{
 };
 
 
-const LOCAL_STORAGE_KEY_VFX = 'magicWandVfxSequence';
+const LOCAL_STORAGE_KEY_SAVED_VFX = 'magicWandSavedVfxSequences';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
@@ -1238,7 +1254,7 @@ export default function App() {
   const [deviceToScan, setDeviceToScan] = React.useState<DeviceType | null>(null);
   
   const [vfxSequence, setVfxSequence] = React.useState<VfxCommand[]>([]);
-  const [isSequenceSaved, setIsSequenceSaved] = React.useState(false);
+  const [savedVfxSequences, setSavedVfxSequences] = React.useState<Record<string, VfxCommand[]>>({});
   const [detectedOpCodes, setDetectedOpCodes] = React.useState<Set<number>>(new Set());
   const [rawPacketLog, setRawPacketLog] = React.useState<RawPacket[]>([]);
   const [spellBook, setSpellBook] = React.useState<Spell[]>([]);
@@ -1307,6 +1323,7 @@ export default function App() {
   const boxCommandCharacteristic = React.useRef<BluetoothRemoteGATTCharacteristic | null>(null);
   const isInitialMountSpells = React.useRef(true);
   const isInitialMountHistory = React.useRef(true);
+  const isInitialMountSavedVfx = React.useRef(true);
   const discoveredSpells = React.useMemo(() => new Set(spellBook.map(s => s.name.toUpperCase())), [spellBook]);
 
   // New: Ref to store macro indices, based on smali reverse engineering
@@ -1327,26 +1344,17 @@ export default function App() {
 
   // Effect to load data from localStorage on initial render
   React.useEffect(() => {
-    // Load VFX Sequence
+    // Load Saved VFX Sequences
     try {
-      const savedSequenceJSON = localStorage.getItem(LOCAL_STORAGE_KEY_VFX);
-      if (savedSequenceJSON) {
-        const savedSequence: VfxCommand[] = JSON.parse(savedSequenceJSON);
-        if (Array.isArray(savedSequence)) {
-          let maxId = 0;
-          const restoredSequence = savedSequence.map((cmd, index) => {
-            const newId = commandIdCounter.current++;
-            if (cmd.id > maxId) maxId = cmd.id;
-            return { ...cmd, id: newId };
-          });
-          setVfxSequence(restoredSequence);
-          setIsSequenceSaved(true);
-          addLog('INFO', 'Loaded saved VFX sequence from storage.');
-        }
+      const savedVFXJSON = localStorage.getItem(LOCAL_STORAGE_KEY_SAVED_VFX);
+      if (savedVFXJSON) {
+        const sequences = JSON.parse(savedVFXJSON);
+        setSavedVfxSequences(sequences);
+        addLog('INFO', 'Loaded saved VFX sequences from storage.');
       }
     } catch (error) {
-      addLog('ERROR', `Failed to load sequence from storage: ${String(error)}`);
-      localStorage.removeItem(LOCAL_STORAGE_KEY_VFX);
+      addLog('ERROR', `Failed to load saved sequences: ${String(error)}`);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_SAVED_VFX);
     }
 
      // Load Spell Book
@@ -1454,6 +1462,24 @@ export default function App() {
           addLog('ERROR', `Failed to save casting history: ${String(error)}`);
       }
   }, [castingHistory, addLog]);
+
+  // New: Effect to auto-save VFX sequences when they change
+  React.useEffect(() => {
+    if (isInitialMountSavedVfx.current) {
+        isInitialMountSavedVfx.current = false;
+        return;
+    }
+    try {
+        if (Object.keys(savedVfxSequences).length > 0) {
+            localStorage.setItem(LOCAL_STORAGE_KEY_SAVED_VFX, JSON.stringify(savedVfxSequences));
+        } else {
+            // If the user deletes the last sequence, remove the key from storage
+            localStorage.removeItem(LOCAL_STORAGE_KEY_SAVED_VFX);
+        }
+    } catch (error) {
+        addLog('ERROR', `Failed to save VFX sequences: ${String(error)}`);
+    }
+}, [savedVfxSequences, addLog]);
 
   // Effect to save TV Broadcast settings
   React.useEffect(() => {
@@ -1936,8 +1962,8 @@ export default function App() {
             if (isClientSideGestureDetectionEnabled && gestureState === 'Idle' && !clientSideGestureDetected) {
                 for (const reading of imuReadings) {
                     const { x, y, z } = reading.acceleration;
-                    // FIX: Changed multiplication to Math.pow to resolve a potential TypeScript type inference issue with the '*' operator.
-                    const magnitude = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
+                    // FIX: Replaced `Math.pow` with the exponentiation operator (`**`) to resolve a type inference issue with arithmetic operations.
+                    const magnitude = Math.sqrt(x ** 2 + y ** 2 + z ** 2);
                     if (magnitude > gestureThreshold) {
                         setClientSideGestureDetected(true);
                         addLog('SUCCESS', `Client-side gesture detected! Accel magnitude: ${magnitude.toFixed(2)}g (Threshold: ${gestureThreshold}g)`);
@@ -2491,28 +2517,56 @@ export default function App() {
       params,
     };
     setVfxSequence([...vfxSequence, newCommand]);
-    setIsSequenceSaved(false);
   };
   
   const updateVfxCommand = (id: number, updatedParams: VfxCommand['params']) => {
     setVfxSequence(vfxSequence.map(cmd => cmd.id === id ? { ...cmd, params: { ...cmd.params, ...updatedParams } } : cmd));
-    setIsSequenceSaved(false);
   };
   
   const removeVfxCommand = (id: number) => {
     setVfxSequence(vfxSequence.filter(cmd => cmd.id !== id));
-    setIsSequenceSaved(false);
   };
 
-  const saveVfxSequence = () => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY_VFX, JSON.stringify(vfxSequence));
-      setIsSequenceSaved(true);
-      addLog('SUCCESS', 'VFX Sequence saved to local storage.');
-    } catch (error) {
-      addLog('ERROR', `Failed to save sequence: ${String(error)}`);
+  const handleSaveNewVfxSequence = React.useCallback(() => {
+    if (vfxSequence.length === 0) {
+        addLog('WARNING', 'Cannot save an empty sequence.');
+        return;
     }
-  };
+    const name = prompt('Enter a name for this sequence:');
+    if (name && name.trim()) {
+        const trimmedName = name.trim();
+        setSavedVfxSequences(prev => ({
+            ...prev,
+            [trimmedName]: vfxSequence
+        }));
+        addLog('SUCCESS', `Sequence "${trimmedName}" saved.`);
+    } else {
+        addLog('INFO', 'Save cancelled.');
+    }
+  }, [vfxSequence, addLog]);
+
+  const handleLoadVfxSequence = React.useCallback((name: string) => {
+    const sequenceToLoad = savedVfxSequences[name];
+    if (sequenceToLoad) {
+        let currentId = commandIdCounter.current;
+        const newSequence = sequenceToLoad.map(cmd => ({...cmd, id: currentId++}));
+        commandIdCounter.current = currentId;
+
+        setVfxSequence(newSequence);
+        addLog('INFO', `Loaded sequence "${name}".`);
+    }
+  }, [savedVfxSequences, addLog]);
+
+  const handleDeleteVfxSequence = React.useCallback((name: string) => {
+    if (window.confirm(`Are you sure you want to delete the sequence "${name}"?`)) {
+        setSavedVfxSequences(prev => {
+            const newSequences = { ...prev };
+            delete newSequences[name];
+            return newSequences;
+        });
+        addLog('INFO', `Deleted sequence "${name}".`);
+    }
+  }, [addLog]);
   
   const sendVfxSequence = React.useCallback(() => {
     if (wandConnectionState !== ConnectionState.CONNECTED || !commandCharacteristic.current) {
@@ -2839,14 +2893,16 @@ export default function App() {
         updateVfxCommand={updateVfxCommand}
         removeVfxCommand={removeVfxCommand}
         sendVfxSequence={sendVfxSequence}
-        saveVfxSequence={saveVfxSequence}
-        isSequenceSaved={isSequenceSaved}
+        saveVfxSequence={handleSaveNewVfxSequence}
         wandConnectionState={wandConnectionState}
         boxConnectionState={boxConnectionState}
         liveEvent={liveEvent}
         castingHistory={castingHistory}
         onCastOnWand={castSpellOnWand}
         onCastOnBox={reactToSpellOnBoxFromUI}
+        savedVfxSequences={savedVfxSequences}
+        loadVfxSequence={handleLoadVfxSequence}
+        deleteVfxSequence={handleDeleteVfxSequence}
       />;
       case 'device_manager': return <DeviceManager 
           wandConnectionState={wandConnectionState}
