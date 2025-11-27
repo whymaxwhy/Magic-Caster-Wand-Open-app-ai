@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 // FIX: WandTypes is exported from types.ts, not constants.ts.
 import { WBDLProtocol, WBDLPayloads, SPELL_LIST, WAND_THRESHOLDS, Houses, WAND_TYPE_IDS, SPELL_DETAILS_DATA } from './constants';
@@ -7,6 +9,7 @@ import { WandTypes, RawPacket, ConnectionState } from './types';
 import type { LogEntry, LogType, VfxCommand, VfxCommandType, Spell, IMUReading, GestureState, DeviceType, WandType, WandDevice, WandDeviceType, House, SpellDetails, SpellUse, ExplorerService, ExplorerCharacteristic, BleEvent, MacroCommand, ButtonThresholds, CastingHistoryEntry } from './types';
 import Scripter from './Scripter';
 import WizardingClass from './WizardingClass';
+import { SpellEditor } from './SpellEditor';
 
 
 // --- HELPER FUNCTIONS ---
@@ -157,7 +160,7 @@ const CheckCircleIcon = () => (
 );
 const SparklesIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H7v1a1 1 0 01-2 0V6H4a1 1 0 010-2h1V3a1 1 0 011-1zm6 0a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V6h-1a1 1 0 010-2h1V3a1 1 0 011-1zM9 10a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H7a1 1 0 010-2h1v-1a1 1 0 011-1zm6-5a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V8h-1a1 1 0 010-2h1V5a1 1 0 011-1zM5 15a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H4a1 1 0 010-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
+    <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H7v1a1 1 0 01-2 0V6H4a1 1 0 010-2h1V3a1 1 0 011-1zm6 0a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V6h-1a1 1 0 010-2h1V5a1 1 0 011-1zM9 10a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H7a1 1 0 010-2h1v-1a1 1 0 011-1zm6-5a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0V8h-1a1 1 0 010-2h1V5a1 1 0 011-1zM5 15a1 1 0 011 1v1h1a1 1 0 010 2h-1v1a1 1 0 01-2 0v-1H4a1 1 0 010-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
   </svg>
 );
 const BookOpenIcon = () => (
@@ -165,7 +168,11 @@ const BookOpenIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
     </svg>
 );
-
+const PencilAltIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+    </svg>
+);
 
 
 // --- UI COMPONENTS ---
@@ -219,6 +226,10 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onFinish }) => {
     {
       title: "Step 4: Dive Deeper",
       content: "For advanced users and reverse engineers, the 'Diagnostics', 'BLE Explorer', and 'Python Scripter' tabs provide powerful tools to monitor raw data, inspect BLE services, and generate control scripts."
+    },
+    {
+      title: "Step 5: Wizarding Class",
+      content: "Visit the 'Wizarding Class' tab to practice wand gestures and earn XP by mastering different spells."
     },
     {
       title: "You're All Set!",
@@ -693,6 +704,7 @@ const LOCAL_STORAGE_KEY_SAVED_VFX = 'magicWandSavedVfxSequences';
 const LOCAL_STORAGE_KEY_SPELLBOOK = 'magicWandSpellBook';
 const LOCAL_STORAGE_KEY_TUTORIAL = 'magicWandTutorialCompleted';
 const LOCAL_STORAGE_KEY_CASTING_HISTORY = 'magicWandCastingHistory';
+const LOCAL_STORAGE_KEY_CUSTOM_SPELLS = 'magicWandCustomSpells';
 
 
 // --- IMU Data Parsing ---
@@ -1249,7 +1261,7 @@ export default function App() {
   const [lastSpell, setLastSpell] = React.useState<{ name: string } | null>(null);
   const [spellDetails, setSpellDetails] = React.useState<SpellDetails | null>(null);
   const [gestureState, setGestureState] = React.useState<GestureState>('Idle');
-  const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter' | 'wizarding_class'>('device_manager');
+  const [activeTab, setActiveTab] = React.useState<'control_hub' | 'device_manager' | 'diagnostics' | 'compendium' | 'explorer' | 'scripter' | 'wizarding_class' | 'spell_editor'>('device_manager');
   const [isScannerOpen, setIsScannerOpen] = React.useState(false);
   const [deviceToScan, setDeviceToScan] = React.useState<DeviceType | null>(null);
   
@@ -1260,6 +1272,9 @@ export default function App() {
   const [spellBook, setSpellBook] = React.useState<Spell[]>([]);
   const [castingHistory, setCastingHistory] = React.useState<CastingHistoryEntry[]>([]);
   const [spellFilter, setSpellFilter] = React.useState('');
+  
+  // Spell Editor State
+  const [customSpells, setCustomSpells] = React.useState<Record<string, SpellDetails>>({});
   
   const [isImuStreaming, setIsImuStreaming] = React.useState(false);
   const [latestImuData, setLatestImuData] = React.useState<IMUReading[] | null>(null);
@@ -1329,6 +1344,10 @@ export default function App() {
   // New: Ref to store macro indices, based on smali reverse engineering
   const macroIndexes = React.useRef<Record<string, number>>({});
 
+  // Merge default spell data with custom spells
+  const masterSpellLibrary = React.useMemo(() => {
+    return { ...SPELL_DETAILS_DATA, ...customSpells };
+  }, [customSpells]);
 
   const addLog = React.useCallback((type: LogType, message: string) => {
     setLogs(prev => [...prev, { id: logCounter.current++, timestamp: getTimestamp(), type, message }]);
@@ -1370,6 +1389,18 @@ export default function App() {
     } catch (error) {
       addLog('ERROR', `Failed to load spell book: ${String(error)}`);
       localStorage.removeItem(LOCAL_STORAGE_KEY_SPELLBOOK);
+    }
+    
+    // Load Custom Spells
+    try {
+        const savedCustomSpellsJSON = localStorage.getItem(LOCAL_STORAGE_KEY_CUSTOM_SPELLS);
+        if (savedCustomSpellsJSON) {
+            const loadedCustomSpells = JSON.parse(savedCustomSpellsJSON);
+            setCustomSpells(loadedCustomSpells);
+            addLog('INFO', 'Loaded custom spell definitions.');
+        }
+    } catch (error) {
+        addLog('ERROR', `Failed to load custom spells: ${String(error)}`);
     }
 
     // Load Casting History
@@ -1523,7 +1554,7 @@ export default function App() {
 
   React.useEffect(() => {
     if (lastSpell?.name) {
-      const details = SPELL_DETAILS_DATA[lastSpell.name.toUpperCase()];
+      const details = masterSpellLibrary[lastSpell.name.toUpperCase()];
       if (details) {
         setSpellDetails(details);
         addLog('SUCCESS', `Looked up local details for ${lastSpell.name}.`);
@@ -1534,7 +1565,7 @@ export default function App() {
     } else {
       setSpellDetails(null);
     }
-  }, [lastSpell, addLog]);
+  }, [lastSpell, addLog, masterSpellLibrary]);
 
 
   const clearKeepAlive = React.useCallback(() => {
@@ -1918,7 +1949,7 @@ export default function App() {
         return; 
     }
     
-    const details = SPELL_DETAILS_DATA[spellName.toUpperCase()];
+    const details = masterSpellLibrary[spellName.toUpperCase()];
     const macros_payoff = details?.config_wandbox?.macros_payoff;
 
     if (!macros_payoff || macros_payoff.length === 0) {
@@ -1936,7 +1967,7 @@ export default function App() {
     addLog('INFO', `Activating local box reaction for '${spellName}'. Executing macro variation ${nextIndex + 1}/${macros_payoff.length}.`);
 
     sendMacroSequence(macroVariation, 'box');
-  }, [addLog, boxConnectionState, sendMacroSequence]);
+  }, [addLog, boxConnectionState, sendMacroSequence, masterSpellLibrary]);
 
   const parseStreamData = React.useCallback((event: Event) => {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
@@ -1962,8 +1993,9 @@ export default function App() {
             if (isClientSideGestureDetectionEnabled && gestureState === 'Idle' && !clientSideGestureDetected) {
                 for (const reading of imuReadings) {
                     const { x, y, z } = reading.acceleration;
-                    // FIX: Replaced `Math.pow` with the exponentiation operator (`**`) to resolve a type inference issue with arithmetic operations.
-                    const magnitude = Math.sqrt(x ** 2 + y ** 2 + z ** 2);
+// FIX: Replace Math.pow with direct multiplication for squaring. This avoids potential obscure type errors with certain TypeScript configurations that may not correctly infer the return type of Math.pow in complex expressions, addressing the arithmetic operation error.
+                    // FIX: Ensure x, y, z are treated as numbers to avoid TS errors
+                    const magnitude = Math.sqrt((x || 0) * (x || 0) + (y || 0) * (y || 0) + (z || 0) * (z || 0));
                     if (magnitude > gestureThreshold) {
                         setClientSideGestureDetected(true);
                         addLog('SUCCESS', `Client-side gesture detected! Accel magnitude: ${magnitude.toFixed(2)}g (Threshold: ${gestureThreshold}g)`);
@@ -2338,7 +2370,9 @@ export default function App() {
 
       // New: MTU Negotiation inspired by smali analysis
       if (server.device.gatt?.mtu) {
-          const newMtu = server.device.gatt.mtu - 3; // 3 bytes for ATT header
+          // Fix: Ensure mtu is treated as a number to avoid arithmetic type errors
+          const currentMtu = server.device.gatt.mtu ?? 23;
+          const newMtu = currentMtu - 3; // 3 bytes for ATT header
           setNegotiatedMtu(newMtu);
           addLog('SUCCESS', `Negotiated MTU size: ${newMtu} bytes (from browser-reported ${server.device.gatt.mtu}).`);
           addBleEvent('GATT', `MTU set to ${newMtu}`);
@@ -2812,7 +2846,7 @@ export default function App() {
   }, [addLog, boxConnectionState, sendMacroSequence]);
 
   const handleSelectCompendiumSpell = (spellName: string) => {
-    const details = SPELL_DETAILS_DATA[spellName.toUpperCase()];
+    const details = masterSpellLibrary[spellName.toUpperCase()];
     if (details) {
         setCompendiumSpellDetails(details);
         setSelectedCompendiumSpell(spellName);
@@ -2877,6 +2911,39 @@ export default function App() {
     queueCommand(WBDLPayloads.BOX_ADDRESS_REQUEST_CMD);
   }, [wandConnectionState, addLog, queueCommand]);
 
+  // --- Spell Editor Functions ---
+  const handleSaveSpell = React.useCallback((key: string, data: SpellDetails) => {
+    setCustomSpells(prev => {
+        const newSpells = { ...prev, [key]: data };
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY_CUSTOM_SPELLS, JSON.stringify(newSpells));
+            addLog('SUCCESS', `Spell definition for '${data.incantation_name}' saved.`);
+        } catch (e) {
+            addLog('ERROR', `Failed to save spell definitions: ${e}`);
+        }
+        return newSpells;
+    });
+  }, [addLog]);
+
+  const handleDeleteSpell = React.useCallback((key: string) => {
+    // We only allow deleting custom spells, or rather "resetting" default ones if we had an override system.
+    // For now, removing from customSpells means we revert to default if it exists there, or it disappears if it was purely custom.
+    setCustomSpells(prev => {
+        const newSpells = { ...prev };
+        delete newSpells[key];
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY_CUSTOM_SPELLS, JSON.stringify(newSpells));
+            addLog('INFO', `Custom spell definition for '${key}' deleted.`);
+        } catch (e) {
+             addLog('ERROR', `Failed to save spell definitions after delete: ${e}`);
+        }
+        return newSpells;
+    });
+  }, [addLog]);
+
+  const testEditorMacro = React.useCallback((macro: MacroCommand[], target: 'wand' | 'box') => {
+      sendMacroSequence(macro, target);
+  }, [sendMacroSequence]);
 
 
   // --- RENDER ---
@@ -2978,6 +3045,14 @@ export default function App() {
         queueCommand={queueCommand}
         queueBoxCommand={queueBoxCommand}
       />;
+      case 'spell_editor': return <SpellEditor
+        spells={masterSpellLibrary}
+        onSave={handleSaveSpell}
+        onDelete={handleDeleteSpell}
+        wandConnected={wandConnectionState === ConnectionState.CONNECTED}
+        boxConnected={boxConnectionState === ConnectionState.CONNECTED}
+        testMacro={testEditorMacro}
+      />;
       default: return null;
     }
   }
@@ -3037,6 +3112,7 @@ export default function App() {
                     <TabButton key="control_hub" Icon={MagicWandIcon} label="Control Hub" onClick={() => setActiveTab('control_hub')} isActive={activeTab === 'control_hub'} />
                     <TabButton key="device_manager" Icon={CubeIcon} label="Device Manager" onClick={() => setActiveTab('device_manager')} isActive={activeTab === 'device_manager'} />
                     <TabButton key="diagnostics" Icon={ChartBarIcon} label="Diagnostics" onClick={() => setActiveTab('diagnostics')} isActive={activeTab === 'diagnostics'} />
+                    <TabButton key="spell_editor" Icon={PencilAltIcon} label="Spell Editor" onClick={() => setActiveTab('spell_editor')} isActive={activeTab === 'spell_editor'} />
                     <TabButton key="compendium" Icon={DocumentSearchIcon} label="Spell Compendium" onClick={() => setActiveTab('compendium')} isActive={activeTab === 'compendium'} />
                     <TabButton key="explorer" Icon={SearchCircleIcon} label="BLE Explorer" onClick={() => setActiveTab('explorer')} isActive={activeTab === 'explorer'} />
                     <TabButton key="scripter" Icon={CodeIcon} label="Python Scripter" onClick={() => setActiveTab('scripter')} isActive={activeTab === 'scripter'} />

@@ -1,5 +1,10 @@
+
+
+
+
+
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { WBDLProtocol } from './constants';
+import { WBDLProtocol, SPELL_DETAILS_DATA } from './constants';
 
 // --- TYPES (from parent) ---
 interface IMUVector {
@@ -58,8 +63,11 @@ interface SpellChallenge {
 }
 
 // --- DATA ---
+// NOTE: These gesture paths are fallbacks. The component now attempts to load
+// custom gestures from localStorage (via the Spell Editor integration) if available.
 const initialChallenges: SpellChallenge[] = [
-  { id: 'lumos', name: 'Lumos', description: 'Creates a small, bright light at the tip of the wand.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 20 80 L 50 20 L 80 80' },
+  // Updated Lumos to be a narrower, sharper upside-down "V"
+  { id: 'lumos', name: 'Lumos', description: 'Creates a small, bright light at the tip of the wand.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 35 90 L 50 10 L 65 90' },
   { id: 'nox', name: 'Nox', description: 'Extinguishes the light created by Lumos.', requiredLevel: 1, difficulty: 1, xpReward: 10, status: 'unlocked', gesturePath: 'M 50 25 L 50 75' },
   { id: 'wingardium_leviosa', name: 'Wingardium Leviosa', description: 'Makes objects float in the air.', requiredLevel: 2, difficulty: 2, xpReward: 25, status: 'locked', gesturePath: 'M 20 70 Q 50 30, 80 70 L 80 80' },
   { id: 'alohomora', name: 'Alohomora', description: 'Unlocks doors and other locked objects.', requiredLevel: 3, difficulty: 2, xpReward: 30, status: 'locked', gesturePath: 'M 30 80 L 30 40 Q 50 20 70 40 L 70 50' },
@@ -72,9 +80,14 @@ const LEVEL_XP_BASE = 100;
 
 // --- GESTURE RECOGNITION HELPERS ---
 const GESTURE_SAMPLE_POINTS = 64;
-const SUCCESS_THRESHOLD = 30; // Lower is better match
+const SUCCESS_THRESHOLD = 80; // Increased threshold for better forgiveness
 
-const distance = (p1: Point, p2: Point) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+// Optimized distance calculation
+const distance = (p1: Point, p2: Point) => {
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    return Math.sqrt(dx * dx + dy * dy);
+};
 
 const pathLength = (points: Point[]) => {
     let length = 0;
@@ -145,7 +158,10 @@ const svgPathToPoints = (pathData: string, numPoints: number): Point[] => {
 };
 
 const comparePaths = (pathA: Point[], pathB: Point[]): number => {
-    if (pathA.length < 2 || pathB.length < 2) return Infinity;
+    // Noise filtering: If the drawn path is significantly shorter than the available canvas, 
+    // it's likely just sensor noise or a stray twitch. Ignore it.
+    // 20 logical units is 20% of the 100x100 drawing area.
+    if (pathLength(pathA) < 20 || pathB.length < 2) return Infinity;
 
     const normalizedA = normalize(pathA, 100);
     const normalizedB = normalize(pathB, 100);
@@ -153,11 +169,22 @@ const comparePaths = (pathA: Point[], pathB: Point[]): number => {
     const resampledA = resample(normalizedA, GESTURE_SAMPLE_POINTS);
     const resampledB = resample(normalizedB, GESTURE_SAMPLE_POINTS);
 
+    // Forward comparison (standard)
     let totalDist = 0;
     for (let i = 0; i < GESTURE_SAMPLE_POINTS; i++) {
         totalDist += distance(resampledA[i], resampledB[i]);
     }
-    return totalDist / GESTURE_SAMPLE_POINTS;
+    const scoreForward = totalDist / GESTURE_SAMPLE_POINTS;
+
+    // Reverse comparison (allows drawing the gesture in reverse order)
+    let totalDistReverse = 0;
+    for (let i = 0; i < GESTURE_SAMPLE_POINTS; i++) {
+        totalDistReverse += distance(resampledA[i], resampledB[GESTURE_SAMPLE_POINTS - 1 - i]);
+    }
+    const scoreReverse = totalDistReverse / GESTURE_SAMPLE_POINTS;
+
+    // Return the better (lower) score
+    return Math.min(scoreForward, scoreReverse);
 };
 
 // --- CASTING MODAL COMPONENT ---
@@ -177,28 +204,46 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
     const [drawnPath, setDrawnPath] = useState<Point[]>([]);
     const wasStreaming = useRef(false);
 
-    const pointQueueRef = useRef<Point[]>([]);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     const lastPositionRef = useRef<Point>({ x: 50, y: 50 });
+    const lastTimestampRef = useRef<number>(0);
     const animationFrameId = useRef<number | null>(null);
+    const pointQueueRef = useRef<Point[]>([]);
 
-    // Effect to process IMU data and add it to a queue for smooth rendering
+    // Effect to integrate IMU data using deltaTime for physics-based movement
     useEffect(() => {
         if (!isRecording || !latestImuData || latestImuData.length === 0) {
             return;
         }
 
-        // FIX: The gyroscope integration scaling factor was too small, making wand
-        // movements nearly invisible. It has been adjusted to a more realistic
-        // value to ensure the drawn path is clearly visible and responsive. The user
-        // can fine-tune this with the sensitivity slider.
-        const dt = 2.0; 
+        const now = performance.now();
+        // REFINEMENT: Calculate the time elapsed since the last data chunk. This is crucial for
+        // accurate physics simulation. It ensures the trace moves at a consistent speed regardless
+        // of how frequently the Bluetooth device sends data.
+        const totalDeltaTime = lastTimestampRef.current > 0 ? (now - lastTimestampRef.current) / 1000 : 0.02 * latestImuData.length;
+        lastTimestampRef.current = now;
+        
+        // REFINEMENT: Average the deltaTime over the number of readings in the chunk.
+        // This provides a time slice for each individual gyroscope measurement.
+        const deltaTimePerReading = totalDeltaTime / latestImuData.length;
+        
         let currentPos = lastPositionRef.current;
         const newPoints: Point[] = [];
 
         for (const reading of latestImuData) {
-            const rawX = currentPos.x + reading.gyroscope.y * dt * drawingSensitivity;
-            const rawY = currentPos.y - reading.gyroscope.x * dt * drawingSensitivity;
+            // REFINEMENT: The core motion integration logic.
+            // The change in position (dx, dy) is the angular velocity (gyroscope reading)
+            // multiplied by a sensitivity factor and the precise time slice (deltaTime).
+            // This is a form of Euler integration: position += velocity * time.
+            // We map gyroscope's Y-axis rotation (yaw) to the screen's X-axis,
+            // and the X-axis rotation (pitch) to the screen's Y-axis.
+            const dx = reading.gyroscope.y * drawingSensitivity * deltaTimePerReading;
+            const dy = -reading.gyroscope.x * drawingSensitivity * deltaTimePerReading;
             
+            const rawX = currentPos.x + dx;
+            const rawY = currentPos.y + dy;
+            
+            // Apply a simple low-pass filter for smoother drawing
             const alpha = 1 - pathSmoothing;
             const smoothedX = alpha * rawX + (1 - alpha) * currentPos.x;
             const smoothedY = alpha * rawY + (1 - alpha) * currentPos.y;
@@ -215,13 +260,13 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
         lastPositionRef.current = currentPos;
 
     }, [latestImuData, isRecording, drawingSensitivity, pathSmoothing]);
-
-    // Effect to run the animation loop for drawing the path smoothly
+    
+    // Animation loop to smoothly draw points from the queue
     useEffect(() => {
         if (isRecording) {
             const animate = () => {
                 if (pointQueueRef.current.length > 0) {
-                    const pointsToProcess = Math.min(pointQueueRef.current.length, 3);
+                    const pointsToProcess = Math.min(pointQueueRef.current.length, 5); // Process more points for smoothness
                     const pointsToAdd = pointQueueRef.current.splice(0, pointsToProcess);
                     setDrawnPath(prev => [...prev, ...pointsToAdd]);
                 }
@@ -237,6 +282,57 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
         };
     }, [isRecording]);
 
+    // Effect for drawing on the canvas whenever the path changes
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Ensure canvas is sized correctly
+        const rect = canvas.parentElement?.getBoundingClientRect();
+        if (rect && (canvas.width !== rect.width || canvas.height !== rect.height)) {
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (drawnPath.length < 2) return;
+
+        // Scale logical points (0-100) to canvas dimensions
+        const scaleX = canvas.width / 100;
+        const scaleY = canvas.height / 100;
+
+        // Configure the "magic" trace style from the blueprint
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#58c9b9';
+
+        ctx.beginPath();
+        ctx.moveTo(drawnPath[0].x * scaleX, drawnPath[0].y * scaleY);
+
+        for (let i = 1; i < drawnPath.length; i++) {
+            ctx.lineTo(drawnPath[i].x * scaleX, drawnPath[i].y * scaleY);
+        }
+        ctx.stroke();
+
+        // Draw a bright orb at the current wand tip position
+        const lastPoint = drawnPath[drawnPath.length - 1];
+        ctx.fillStyle = 'white';
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#facc15';
+        ctx.beginPath();
+        ctx.arc(lastPoint.x * scaleX, lastPoint.y * scaleY, 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+    }, [drawnPath]);
+
+
     const handleToggleRecording = () => {
         if (!isRecording) {
             wasStreaming.current = isImuStreaming;
@@ -246,6 +342,7 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
             const startPoint = { x: 50, y: 50 };
             setDrawnPath([startPoint]);
             lastPositionRef.current = startPoint;
+            lastTimestampRef.current = performance.now();
             pointQueueRef.current = [];
             setIsRecording(true);
         } else {
@@ -266,45 +363,27 @@ const CastingModal: React.FC<CastingModalProps> = ({ spell, onClose, handleCastA
         }
     };
 
-    const drawnPathString = drawnPath.map(p => `${p.x},${p.y}`).join(' ');
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 animate-fade-in">
-            <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-lg border border-slate-700 m-4">
-                <div className="p-6">
-                    <h3 className="text-2xl font-bold text-indigo-400">Cast: {spell.name}</h3>
-                    <p className="text-slate-400 mb-4">Trace the gesture with your wand.</p>
-                    <div className="relative bg-slate-950 rounded-lg aspect-square w-full border border-slate-600 overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-lg flex items-center justify-center z-50 animate-fade-in">
+            <div className="w-full max-w-lg m-4">
+                <div className="p-6 text-center">
+                    <h3 className="text-2xl font-bold text-indigo-300 drop-shadow-lg">Cast: {spell.name}</h3>
+                    <p className="text-slate-300 mb-4 drop-shadow-md">Trace the gesture with your wand.</p>
+                    <div className="relative rounded-lg aspect-square w-full overflow-hidden">
+                        {/* Static SVG for the guide path, layered behind the canvas */}
                         <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
-                            <defs>
-                                <filter id="wand-glow" x="-50%" y="-50%" width="200%" height="200%">
-                                    <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
-                                    <feMerge>
-                                        <feMergeNode in="blur" />
-                                        <feMergeNode in="SourceGraphic" />
-                                    </feMerge>
-                                </filter>
-                            </defs>
-                            <path d={spell.gesturePath} stroke="#4F46E5" strokeWidth="2" fill="none" strokeDasharray="4" opacity="0.7" />
-                            {drawnPath.length > 1 && (
-                                <polyline 
-                                    points={drawnPathString} 
-                                    stroke="#34D399" 
-                                    strokeWidth="2" 
-                                    fill="none" 
-                                    strokeLinecap="round" 
-                                    strokeLinejoin="round" 
-                                    filter="url(#wand-glow)"
-                                />
-                            )}
+                            <path d={spell.gesturePath} stroke="#4F46E5" strokeWidth="2" fill="none" strokeDasharray="4" opacity="0.5" />
                         </svg>
+                        {/* Canvas for dynamic user drawing */}
+                        <canvas ref={canvasRef} className="relative w-full h-full" />
                     </div>
                 </div>
-                <div className="bg-slate-900/50 p-4 rounded-b-lg flex justify-between items-center">
-                    <button onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded font-semibold">
+                <div className="p-4 flex justify-between items-center">
+                    <button onClick={onClose} className="px-4 py-2 bg-slate-700/80 hover:bg-slate-600/80 rounded font-semibold shadow-lg">
                         Cancel
                     </button>
-                    <button onClick={handleToggleRecording} className={`px-4 py-2 rounded font-semibold text-white ${isRecording ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'}`}>
+                    <button onClick={handleToggleRecording} className={`px-4 py-2 rounded font-semibold text-white shadow-lg ${isRecording ? 'bg-red-600/80 hover:bg-red-500/80' : 'bg-green-600/80 hover:bg-green-500/80'}`}>
                         {isRecording ? 'Finish Casting' : 'Start Casting'}
                     </button>
                 </div>
@@ -353,8 +432,26 @@ const WizardingClass: React.FC<WizardingClassProps> = ({ isImuStreaming, toggleI
   const [activeChallengeId, setActiveChallengeId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isCastingModalOpen, setIsCastingModalOpen] = useState(false);
-  const [drawingSensitivity, setDrawingSensitivity] = useState(15);
-  const [pathSmoothing, setPathSmoothing] = useState(0.4);
+  const [drawingSensitivity, setDrawingSensitivity] = useState(20); // Increased default sensitivity
+  const [pathSmoothing, setPathSmoothing] = useState(0.2);
+
+  // New: Effect to load custom gesture paths from custom spells if they exist
+  useEffect(() => {
+    try {
+        const storedCustomSpells = localStorage.getItem('magicWandCustomSpells');
+        if (storedCustomSpells) {
+            const customData = JSON.parse(storedCustomSpells);
+            setChallenges(prev => prev.map(c => {
+                const upperName = c.name.toUpperCase().replace(/\s/g, '_');
+                const custom = customData[upperName];
+                if (custom && custom.gesturePath) {
+                    return { ...c, gesturePath: custom.gesturePath };
+                }
+                return c;
+            }));
+        }
+    } catch(e) { console.error("Error loading custom gestures into class", e); }
+  }, []);
 
   const xpToNextLevel = useMemo(() => {
     return Math.floor(LEVEL_XP_BASE * Math.pow(1.5, level - 1));
@@ -457,12 +554,12 @@ const WizardingClass: React.FC<WizardingClassProps> = ({ isImuStreaming, toggleI
             <h4 className="font-semibold text-lg mb-2">Practice Settings</h4>
             <div className="space-y-3">
                 <div>
-                    <label htmlFor="sensitivity-slider" className="block text-sm font-medium text-slate-400">Drawing Sensitivity: {drawingSensitivity}</label>
+                    <label htmlFor="sensitivity-slider" className="block text-sm font-medium text-slate-400">Drawing Sensitivity: {drawingSensitivity.toFixed(1)}</label>
                     <input 
                         id="sensitivity-slider"
                         type="range" 
-                        min="5" 
-                        max="30" 
+                        min="1" 
+                        max="50" 
                         step="1"
                         value={drawingSensitivity} 
                         onChange={e => setDrawingSensitivity(Number(e.target.value))} 

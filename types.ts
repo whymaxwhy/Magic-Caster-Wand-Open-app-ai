@@ -1,3 +1,4 @@
+
 // Fix: Moved Web Bluetooth API types here to make them globally available.
 // Add minimal type definitions for Web Bluetooth API to resolve TypeScript errors.
 // This is a workaround for the environment not having these types available.
@@ -177,6 +178,8 @@ export interface SpellDetails {
   difficulty: number;
   spell_background_color: string;
   spell_uses: SpellUse[];
+  // New: SVG path string for custom gestures
+  gesturePath?: string; 
   config_wand?: {
     macros_payoff?: MacroCommand[][];
   };
